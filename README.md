@@ -4,6 +4,10 @@ Don't FRET
 
 Don't FRET! is a python package featuring a web application for performing burst search on confocal smFRET data. 
 
+```
+pip install dont-fret
+```
+
 
 ## Process photon files
 
