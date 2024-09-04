@@ -97,5 +97,6 @@ solara run dont_fret\tmp.py -- --config default_testing.yaml
 
 ### Create a new release
 
-- Create a new release on github
+- Create a new release on github. Create a new tag with the version (format: v0.1.0)
 - github actions creates release on pypi
+- done!
