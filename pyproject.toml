@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dont-fret"
+description = "Analyze confocal solution smFRET data"
+authors = [
+  { name = "Jochem Smit", email = "jhsmit@gmail.com" },
+]
+license = "MIT"
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Intended Audience :: Science/Research",
+
+]
+dependencies = [
+    "numpy>=1.18.0",
+    "tqdm>=4.64.1",
+    "typing-extensions>=4.4.0",
+    "PyYAML>=6.0",
+    "pandas>=1.5.3",
+    "dacite",
+    "numba>=0.56.4",
+    "polars>=0.20.23",
+    "phconvert",
+    "click",
+    "solara>=1.19.0",
+    "plotly",
+]
+dynamic = ["version"]
+
+[project.scripts]
+dont-fret = "dont_fret.__main__:cli"
+
+[project.optional-dependencies]
+plot = [
+    "matplotlib",
+    "kdepy",
+
+]
+docs = [
+    "mkdocs>=1.4.2",
+    "mkdocstrings[python]>=0.19.1",
+    "mkdocs-material>=8.5.11",
+    "pygments>=2.13.0",
+    "mkdocs-gen-files>=0.4.0",
+    "mkdocs-literate-nav>=0.5.0",
+]
+test = [
+    "pytest>=7.2.0",
+    "pytest-playwright>=0.3.3",
+    "pytest-asyncio",
+]
+
+
+[project.urls]
+Source = "https://github.com/Jhsmit/dont-fret/"
+
+[tool.hatch.build]
+exclude = [
+    "_versioneer.py"
+]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "dont_fret/_version.py"
+
+[tool.flake8]
+max-line-length = 100
+ignore = "D203"
+exclude = [".git", "__pycache__", "build", "dist", "docs"]
+max-complexity = 10
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100

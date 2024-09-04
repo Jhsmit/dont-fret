@@ -1,0 +1,533 @@
+acquisition_duration: 36000.0
+creation_time: '2019-01-28 17:56:04'
+hardware_name: TimeHarp260P
+laser_repetition_rate: 20000000
+nanotimes_unit: 2.50000003337858e-11
+record_type: rtTimeHarp260PT3
+software: SymPhoTime 64
+software_version: '2.4'
+tags:
+  CreatorSW_Modules:
+    idx: -1
+    type: tyInt8
+    value: 0
+  CreatorSW_Name:
+    data: SymPhoTime 64
+    idx: -1
+    type: tyAnsiString
+    value: 16
+  CreatorSW_SVNBuild:
+    idx: -1
+    type: tyInt8
+    value: 4874
+  CreatorSW_Version:
+    data: '2.4'
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  Fast_Load_End:
+    idx: -1
+    type: tyEmpty8
+    value: 0
+  File_Comment:
+    data: 2000 dillution
+    idx: -1
+    type: tyAnsiString
+    value: 16
+  File_CreatingTime:
+    idx: -1
+    type: tyTDateTime
+    value: '2019-01-28 17:56:04'
+  File_GUID:
+    data: '{7BB8CC14-384D-41EB-A4BC-139FFBA9E53C}'
+    idx: -1
+    type: tyAnsiString
+    value: 40
+  HWInpChan_CFDLevel:
+    idx:
+    - 0
+    - 1
+    type:
+    - tyInt8
+    - tyInt8
+    value:
+    - -100
+    - -100
+  HWInpChan_CFDZeroCross:
+    idx:
+    - 0
+    - 1
+    type:
+    - tyInt8
+    - tyInt8
+    value:
+    - -10
+    - -10
+  HWInpChan_Enabled:
+    idx:
+    - 0
+    - 1
+    type:
+    - tyBool8
+    - tyBool8
+    value:
+    - true
+    - true
+  HWInpChan_ModuleIdx:
+    idx:
+    - 0
+    - 1
+    type:
+    - tyInt8
+    - tyInt8
+    value:
+    - 1
+    - 1
+  HWInpChan_Offset:
+    idx:
+    - 0
+    - 1
+    type:
+    - tyInt8
+    - tyInt8
+    value:
+    - 0
+    - 450
+  HWInpChan_TdCode:
+    idx:
+    - 0
+    - 1
+    type:
+    - tyInt8
+    - tyInt8
+    value:
+    - 4
+    - 4
+  HWMarkers_Enabled:
+    idx:
+    - 0
+    - 1
+    - 2
+    - 3
+    type:
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    value:
+    - true
+    - true
+    - true
+    - true
+  HWMarkers_HoldOff:
+    idx: -1
+    type: tyInt8
+    value: 0
+  HWMarkers_RisingEdge:
+    idx:
+    - 0
+    - 1
+    - 2
+    - 3
+    type:
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    value:
+    - false
+    - false
+    - false
+    - false
+  HWModule_TypeCode:
+    idx: 0
+    type: tyInt8
+    value: 1000
+  HWModule_VersCode:
+    idx: 0
+    type: tyInt8
+    value: 18939908
+  HWSync_CFDLevel:
+    idx: -1
+    type: tyInt8
+    value: -150
+  HWSync_CFDZeroCross:
+    idx: -1
+    type: tyInt8
+    value: -10
+  HWSync_Divider:
+    idx: -1
+    type: tyInt8
+    value: 8
+  HWSync_Offset:
+    idx: -1
+    type: tyInt8
+    value: 74000
+  HW_BaseResolution:
+    idx: -1
+    type: tyFloat8
+    value: 2.50000003337858e-11
+  HW_ExternalRefClock:
+    idx: -1
+    type: tyBool8
+    value: false
+  HW_InpChannels:
+    idx: -1
+    type: tyInt8
+    value: 3
+  HW_Markers:
+    idx: -1
+    type: tyInt8
+    value: 4
+  HW_Modules:
+    idx: -1
+    type: tyInt8
+    value: 1
+  HW_SerialNo:
+    data: '1034990'
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  HW_Type:
+    data: TimeHarp260P
+    idx: -1
+    type: tyAnsiString
+    value: 16
+  HW_Version:
+    data: 0121-0422-02.01
+    idx: -1
+    type: tyAnsiString
+    value: 16
+  Header_End:
+    idx: -1
+    type: tyEmpty8
+    value: 0
+  ImgHdr_Dimensions:
+    idx: -1
+    type: tyInt8
+    value: 1
+  ImgHdr_Ident:
+    idx: -1
+    type: tyInt8
+    value: 7
+  ImgHdr_X0:
+    idx: -1
+    type: tyFloat8
+    value: 40.0
+  ImgHdr_Y0:
+    idx: -1
+    type: tyFloat8
+    value: 40.0
+  ImgHdr_Z0:
+    idx: -1
+    type: tyFloat8
+    value: 40.0
+  MeasDesc_AcquisitionTime:
+    idx: -1
+    type: tyInt8
+    value: 36000000
+  MeasDesc_BinningFactor:
+    idx: -1
+    type: tyInt8
+    value: 1
+  MeasDesc_GlobalResolution:
+    idx: -1
+    type: tyFloat8
+    value: 5.0e-08
+  MeasDesc_Resolution:
+    idx: -1
+    type: tyFloat8
+    value: 2.50000003337858e-11
+  Measurement_Mode:
+    idx: -1
+    type: tyInt8
+    value: 3
+  Measurement_SubMode:
+    idx: -1
+    type: tyInt8
+    value: 1
+  Sep2_FirmwareVersion:
+    data: 1.05.420
+    idx: -1
+    type: tyAnsiString
+    value: 16
+  Sep2_SCM_000_SerialNo:
+    data: '1034451'
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  Sep2_SLM_200_CW_PulseDisable:
+    idx: -1
+    type: tyBool8
+    value: false
+  Sep2_SLM_200_FineIntensity:
+    idx: -1
+    type: tyInt8
+    value: 57
+  Sep2_SLM_200_HeadType:
+    data: LASER
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  Sep2_SLM_200_SerialNo:
+    data: '1035701'
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  Sep2_SLM_200_TriggerIndex:
+    idx: -1
+    type: tyInt8
+    value: 7
+  Sep2_SLM_300_CW_PulseDisable:
+    idx: -1
+    type: tyBool8
+    value: false
+  Sep2_SLM_300_FineIntensity:
+    idx: -1
+    type: tyInt8
+    value: 40
+  Sep2_SLM_300_HeadType:
+    data: LASER
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  Sep2_SLM_300_SerialNo:
+    data: '1035702'
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  Sep2_SLM_300_TriggerIndex:
+    idx: -1
+    type: tyInt8
+    value: 7
+  Sep2_SOM_100_BaseOscFreq:
+    idx: -1
+    type: tyFloat8
+    value: 80000000.0
+  Sep2_SOM_100_Divider:
+    idx: -1
+    type: tyInt8
+    value: 2
+  Sep2_SOM_100_InvSyncMask:
+    idx: -1
+    type: tyBool8
+    value: true
+  Sep2_SOM_100_PreSync:
+    idx: -1
+    type: tyInt8
+    value: 0
+  Sep2_SOM_100_Seq_BurstLen:
+    idx:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    type:
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    value:
+    - 1
+    - 1
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+  Sep2_SOM_100_Seq_CoarseDelay:
+    idx:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    type:
+    - tyFloat8
+    - tyFloat8
+    - tyFloat8
+    - tyFloat8
+    - tyFloat8
+    - tyFloat8
+    - tyFloat8
+    - tyFloat8
+    value:
+    - 0.0
+    - 0.7
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+  Sep2_SOM_100_Seq_EnaOutput:
+    idx:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    type:
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    value:
+    - true
+    - true
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+  Sep2_SOM_100_Seq_EnaSync:
+    idx:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    type:
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    - tyBool8
+    value:
+    - true
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+  Sep2_SOM_100_Seq_FineDelay:
+    idx:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    type:
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    - tyInt8
+    value:
+    - 20
+    - 20
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+  Sep2_SOM_100_SerialNo:
+    data: '1035467'
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  Sep2_SOM_100_SyncMask:
+    idx: -1
+    type: tyInt8
+    value: 1
+  Sep2_SerialNo:
+    data: '1034451'
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  TTResultFormat_BitsPerRecord:
+    idx: -1
+    type: tyInt8
+    value: 32
+  TTResultFormat_TTTRRecType:
+    idx: -1
+    type: tyInt8
+    value: 66310
+  TTResult_InputRate:
+    idx:
+    - 0
+    - 1
+    type:
+    - tyInt8
+    - tyInt8
+    value:
+    - 100
+    - 80
+  TTResult_NumberOfRecords:
+    idx: -1
+    type: tyInt8
+    value: 1132842
+  TTResult_StopAfter:
+    idx: -1
+    type: tyInt8
+    value: 81440
+  TTResult_StopReason:
+    idx: -1
+    type: tyInt8
+    value: 1
+  TTResult_SyncRate:
+    idx: -1
+    type: tyInt8
+    value: 20000000
+  UsrHeadName:
+    data:
+    - 520.0nm (LDH-D-C-520)
+    - 640.0nm (LDH-D-C-640)
+    idx:
+    - 0
+    - 1
+    type:
+    - tyAnsiString
+    - tyAnsiString
+    value:
+    - 24
+    - 24
+  UsrPowerDiode:
+    idx: -1
+    type: tyFloat8
+    value: 40207.30211684235
+  UsrPulseCfg:
+    data: PIE
+    idx: -1
+    type: tyAnsiString
+    value: 8
+  UsrPulseCfgIdx:
+    idx: -1
+    type: tyInt8
+    value: 1
+timestamps_unit: 5.0e-08

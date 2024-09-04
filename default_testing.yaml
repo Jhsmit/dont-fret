@@ -1,0 +1,50 @@
+channels: # refactor channels in code to channel_identifiers
+  laser_D:
+    target: nanotimes
+    value: [ 0, 1000 ]
+  laser_A:
+    target: nanotimes
+    value: [ 1000, 2000 ] # intervals are inclusive, exclusive
+  det_D:
+    target: detectors
+    value: 1
+  det_A:
+    target: detectors
+    value: 0
+
+streams:
+  DD: [laser_D, det_D]
+  DA: [laser_D, det_A]
+  AA: [laser_A, det_A]
+  AD: [laser_A, det_D]
+
+# TODO this should move to web config
+burst_search:
+  DCBS:  # name of the burst search
+    - streams: [DD, DA]  # photons streams to use
+      L: 50
+      M: 35
+      T: 500.e-6
+    - streams: [AA]
+      L: 50
+      M: 35
+      T: 500.e-6
+  APBS:
+    - streams: [DD, DA, AA]
+      L: 50
+      M: 100
+      T: 500.e-6
+  test234:
+    - streams: [DD, DA, AA]
+      L: 500
+      M: 100
+      T: 500.e-6
+
+# settings related to dont-fret's web interface
+web:
+  password: null
+  default_dir: tests\test_data\input\ds2 # default directory show in the file browser
+  protect_filebrowser: false # true to prevent navigation above default_dir
+  burst_filters: # default filters to apply to burst search filters
+    - name: n_photons
+      min: 150

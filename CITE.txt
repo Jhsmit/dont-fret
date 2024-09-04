@@ -1,0 +1,17 @@
+
+https://pypi.org/project/fastkde/
+FastKDE:
+    O’Brien, T. A., Kashinath, K., Cavanaugh, N. R., Collins, W. D. & O’Brien, J. P. A fast and objective multidimensional kernel density estimation method: fastKDE. Comput. Stat. Data Anal. 101, 148–160 (2016).
+
+    O’Brien, T. A., Collins, W. D., Rauscher, S. A. & Ringler, T. D. Reducing the computational cost of the ECF using a nuFFT: A fast and objective probability density estimation method. Comput. Stat. Data Anal. 79, 222–234 (2014).
+
+phconvert:
+https://github.com/Photon-HDF5/phconvert
+citation?
+
+photon-hdf5:
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4805879/
+
+burst search:
+"Data registration and selective single-molecule analysis using multi-parameter fluorescence detection"
+DOI: 10.1016/S0168-1656(00)00412-0

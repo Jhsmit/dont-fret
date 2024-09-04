@@ -1,0 +1,43 @@
+name: Test CLI App Packaging
+
+on: [push]
+
+jobs:
+  test-packaging:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install hatch
+      run: pip install hatch
+
+    - name: Build project
+      run: hatch build
+
+    - name: Install uv
+      run: pip install uv
+
+    - name: Create uv venv
+      run: | 
+        uv venv
+        . .venv/bin/activate
+
+    - name: Install package using uv
+      run: |
+        uv pip install dist/*.tar.gz
+
+    - name: Run dont fret serve
+      run: |
+        timeout 10s dont-fret serve || exit_code=$?
+        if [ $exit_code -eq 124 ]; then
+          echo "ran for 10 seconds without error"
+          exit 0
+        else
+          echo "failed or exited too quickly"
+          exit 1
+        fi
