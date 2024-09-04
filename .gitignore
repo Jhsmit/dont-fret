@@ -118,8 +118,4 @@ server_user_id.txt
 _version.py
 
 # local testing datasets
-tests/test_data/input/ds1
-tests/test_data/input/ds2
-tests/test_data/input/ds3
-tests/test_data/input/ds4
-tests/test_data/input/ds5
+*.ptu
