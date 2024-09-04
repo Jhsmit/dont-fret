@@ -76,12 +76,12 @@ streams:
   AD: [laser_A, det_D]
 ```
 
-> [!IMPORTANT]  
-> The notation used here is excitation then emission, thus the FRET stream is 'DA' while in literature the FRET photon stream is often written as `A|D` (Acceptor emission during donor excitation). 
+!IMPORTANT
+The notation used here is excitation then emission, thus the FRET stream is 'DA' while in literature the FRET photon stream is often written as `A|D` (Acceptor emission during donor excitation). 
 
 
-> [!IMPORTANT]  
-> At the moment apparent FRET and stoichiometry are calculated from the defined photon streams and it is required the following streams are defined: 'AA', 'DD', 'DA' (=FRET). This is expected to be changed in future updates.
+!IMPORTANT  
+At the moment apparent FRET and stoichiometry are calculated from the defined photon streams and it is required the following streams are defined: 'AA', 'DD', 'DA' (=FRET). This is expected to be changed in future updates.
 
 ## Development
 
@@ -94,3 +94,8 @@ wget https://kuleuven-my.sharepoint.com/:u:/g/personal/jochem_smit_kuleuven_be/E
 
 If autoreload (refresh web application upon code changes) doesnt work, run from:
 solara run dont_fret\tmp.py -- --config default_testing.yaml
+
+### Create a new release
+
+- Create a new release on github
+- github actions creates release on pypi
