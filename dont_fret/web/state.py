@@ -1,14 +1,19 @@
 import copy
+import dataclasses
+import uuid
 from pathlib import Path
+from typing import Callable, Generic, Type, TypeVar
 
 import solara
+from attrs import define, field
 
 from dont_fret.config import cfg
-from dont_fret.web.models import BurstColorList
+from dont_fret.web.models import BurstColorList, BurstNode, PhotonNode
+from dont_fret.web.new_models import FRETStore, ThreadedDataManager
 from dont_fret.web.reactive import BurstSettingsReactive, ReactiveFRETNodes, SnackbarReactive
 
 APP_TITLE = "Don't FRET!"
-fret_nodes = ReactiveFRETNodes([])
+# fret_nodes = ReactiveFRETNodes([])
 
 filebrowser_folder = solara.Reactive[Path](cfg.web.default_dir)
 burst_settings = BurstSettingsReactive({k: BurstColorList(v) for k, v in cfg.burst_search.items()})
@@ -21,3 +26,14 @@ burst_figure_selection = [
     (solara.Reactive(0), solara.Reactive(0)),
     (solara.Reactive(0), solara.Reactive(0)),
 ]
+
+# TODO reactive classes should have front end stuff ONLY
+# no photons. just their names
+# then we dont have to have burst search method for headless and web seperately
+
+
+fret_nodes = FRETStore([])
+
+
+# cfg set to dask manager
+data_manager = ThreadedDataManager()

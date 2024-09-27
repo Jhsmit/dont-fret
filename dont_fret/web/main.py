@@ -13,16 +13,17 @@ from dont_fret.config import cfg
 from dont_fret.web.bursts import BurstPage
 from dont_fret.web.components import Snackbar
 from dont_fret.web.home import HomePage
-from dont_fret.web.models import BurstColorList, FRETNode
+from dont_fret.web.models import BurstColorList
+from dont_fret.web.new_models import FRETNode
 from dont_fret.web.trace import TracePage
 
 
 def disable_bursts(nodes: list[FRETNode]) -> bool:
-    return not bool([ph for node in nodes for ph in node.bursts])
+    return not any([n.bursts for n in nodes])
 
 
 def disable_trace(nodes: list[FRETNode]) -> bool:
-    return not bool([b for node in nodes for b in node.photons])
+    return not any([n.photons for n in nodes])
 
 
 pages = [
@@ -103,7 +104,7 @@ def Page():
                 for page in pages:
                     if page["show"]():
                         solara.lab.Tab(
-                            page["name"], disabled=page["disabled"](state.fret_nodes.value)
+                            page["name"], disabled=page["disabled"](state.fret_nodes.items)
                         )
         solara.Title(state.APP_TITLE)
 

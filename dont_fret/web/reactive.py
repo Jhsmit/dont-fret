@@ -10,11 +10,11 @@ from dont_fret import cfg
 from dont_fret.config.config import BurstColor
 from dont_fret.web.models import (
     BurstColorList,
-    BurstItem,
-    FRETNode,
-    PhotonFileItem,
+    BurstNode,
+    PhotonNode,
     SnackbarMessage,
 )
+from dont_fret.web.new_models import FRETNode
 
 S = TypeVar("S")
 
@@ -71,12 +71,12 @@ class ReactiveFRETNodes(solara.Reactive[list[FRETNode]]):
         ref = Ref(self.fields[idx].photons)
         ref.value = []
 
-    def add_photon_files(self, node_id: str, photon_files: list[PhotonFileItem]) -> None:
+    def add_photon_files(self, node_id: str, photon_files: list[PhotonNode]) -> None:
         idx = self.node_idx(node_id)
         ref = Ref(self.fields[idx].photons)
         ref.value = ref.value + photon_files
 
-    def add_burst_items(self, node_id: str, burst_items: list[BurstItem]) -> None:
+    def add_burst_items(self, node_id: str, burst_items: list[BurstNode]) -> None:
         """
         adds a burst item. If the item already exists, it will be replaced
         """
@@ -88,19 +88,17 @@ class ReactiveFRETNodes(solara.Reactive[list[FRETNode]]):
         ref.value = previous_items + burst_items
 
     @overload
-    def get_item(
-        self, node_id: str, item_type: Literal["photons"], item_name: str
-    ) -> PhotonFileItem:
+    def get_item(self, node_id: str, item_type: Literal["photons"], item_name: str) -> PhotonNode:
         ...
 
     @overload
-    def get_item(self, node_id: str, item_type: Literal["bursts"], item_name: str) -> BurstItem:
+    def get_item(self, node_id: str, item_type: Literal["bursts"], item_name: str) -> BurstNode:
         ...
 
     # overload for type checking
     def get_item(
         self, node_id: str, item_type: Literal["photons", "bursts"], item_name: str
-    ) -> Union[PhotonFileItem, BurstItem]:
+    ) -> Union[PhotonNode, BurstNode]:
         idx = self.node_idx(node_id)
         ref = Ref(getattr(self.fields[idx], item_type))
         for item in ref.value:
@@ -129,11 +127,11 @@ class ReactiveList(solara.Reactive[list[S]]):
         # self.value = [item for i, item in enumerate(self.value) if i != idx]
 
 
-class PhotonFileReactiveList(ReactiveList[PhotonFileItem]):
+class PhotonFileReactiveList(ReactiveList[PhotonNode]):
     def __init__(self, *args, **kwargs):
         raise DeprecationWarning("deprecated in favour of ReactiveFRETNodes")
 
-    def add_file_items(self, file_items: list[PhotonFileItem]) -> None:
+    def add_file_items(self, file_items: list[PhotonNode]) -> None:
         new_items = self.value + [f for f in file_items if f.file_info["name"] not in self.names]
         if new_items:
             self.value = new_items
@@ -166,7 +164,7 @@ class PhotonFileReactiveList(ReactiveList[PhotonFileItem]):
         return [i for i, f in enumerate(self.value) if f.selected]
 
 
-class BurstItemsReactiveList(ReactiveList[BurstItem]):
+class BurstItemsReactiveList(ReactiveList[BurstNode]):
     @property
     def names(self) -> list[str]:
         """Returns names of all files"""

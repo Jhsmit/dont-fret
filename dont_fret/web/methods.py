@@ -6,26 +6,29 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import reduce
 from operator import and_
 from pathlib import Path
-from typing import Literal, Optional, TypedDict, Union
+from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union
 
 import polars as pl
 
+import dont_fret.web.state as state
 from dont_fret import BinnedPhotonData
 from dont_fret.config.config import BurstColor
 from dont_fret.formatting import TRACE_COLORS
 from dont_fret.web.models import (
     BurstFilterItem,
-    BurstItem,
-    FRETNode,
+    BurstNode,
     PhotonData,
-    PhotonFileItem,
+    PhotonNode,
     TraceSettings,
 )
 
+if TYPE_CHECKING:
+    from dont_fret.web.new_models import FRETNode
+
 
 def batch_burst_search(
-    photon_file_items: list[PhotonFileItem], burst_colors: str, max_workers: int = 4
-) -> BurstItem:
+    photon_file_items: list[PhotonNode], burst_colors: str, max_workers: int = 4
+) -> BurstNode:
     """
     Search all photon file items in batch threaded.
     """
@@ -40,11 +43,11 @@ def batch_burst_search(
     df = pl.concat([f.result() for f in futures], how="vertical_relaxed")
     metadata = {fi.name: fi.get_info() for fi in photon_file_items}
 
-    return BurstItem(name=burst_colors, df=df, metadata=metadata)
+    return BurstNode(name=burst_colors, df=df, metadata=metadata)
 
 
 def burst_search(
-    ph_file_item: PhotonFileItem, burst_colors: str | list[BurstColor], dtype: pl.Enum
+    ph_file_item: PhotonNode, burst_colors: str | list[BurstColor], dtype: pl.Enum
 ) -> pl.DataFrame:
     photons = ph_file_item.get_photons()
     bursts = photons.burst_search(burst_colors)
@@ -72,13 +75,13 @@ def chain_filters(filters: list[BurstFilterItem]) -> Union[pl.Expr, Literal[True
 
 
 # todo move to `dev`
-def create_file_items(pth: Path) -> list[PhotonFileItem]:
+def create_file_items(pth: Path) -> list[PhotonNode]:
     """Return a list of `PhotonFileItem` objects from a directory containing ptu files."""
-    return [PhotonFileItem(file_path=ptu_pth) for ptu_pth in pth.glob("*.ptu")]
+    return [PhotonNode(file_path=ptu_pth) for ptu_pth in pth.glob("*.ptu")]
 
 
 # move to `dev` ?
-def gen_fileitems(n: Optional[int] = None, directory: str = "ds2") -> list[PhotonFileItem]:
+def gen_fileitems(n: Optional[int] = None, directory: str = "ds2") -> list[PhotonNode]:
     """Returns a list of the first `n` FileItem objects generated from
     the data in `TEST_FILE_DIR`"""
 
@@ -143,36 +146,36 @@ def generate_traces(
 
 def to_treeview(nodes: list[FRETNode]) -> list[dict]:
     items = []
-    for fret_node in nodes:
+    for node_idx, fret_node in enumerate(nodes):
         item = {
-            "name": fret_node.name,
-            "id": fret_node.id,
+            "name": fret_node.name.value,
+            "id": str(node_idx),
             "icon": "mdi-ruler",
             "children": [
                 {
                     "name": "Photons",
-                    "id": f"{fret_node.id}:photons",
+                    "id": f"{node_idx}:photons",
                     "icon": "mdi-lightbulb",
                     "children": [
                         {
                             "name": photon_file.name,
-                            "id": f"{fret_node.id}:photons:{photon_file.name}",
+                            "id": f"{node_idx}:photons:{ph_idx}",
                             "icon": "mdi-file-star",
                         }
-                        for photon_file in fret_node.photons
+                        for ph_idx, photon_file in enumerate(fret_node.photons.items)
                     ],
                 },
                 {
                     "name": "Bursts",
-                    "id": f"{fret_node.id}:bursts",
+                    "id": f"{node_idx}:bursts",
                     "icon": "mdi-flash",
                     "children": [
                         {
                             "name": burst_item.name,
-                            "id": f"{fret_node.id}:bursts:{burst_item.name}",
+                            "id": f"{node_idx}:bursts:{b_idx}",
                             "icon": "mdi-file-chart",
                         }
-                        for burst_item in fret_node.bursts
+                        for b_idx, burst_item in enumerate(fret_node.bursts.items)
                     ],
                 },
             ],
@@ -180,3 +183,20 @@ def to_treeview(nodes: list[FRETNode]) -> list[dict]:
 
         items.append(item)
     return items
+
+
+def get_info(photons: PhotonData) -> dict:
+    info = {}
+    info["creation_time"] = photons.metadata["creation_time"]
+    info["number_of_photons"] = len(photons)
+    info["acquisition_duration"] = photons.metadata["acquisition_duration"]
+    info["power_diode"] = photons.metadata["tags"]["UsrPowerDiode"]["value"]
+
+    info["cps"] = photons.cps
+    t_max = photons.photon_times.max()
+    counts = photons.data["stream"].value_counts(sort=True)
+    info["stream_cps"] = {k: v / t_max for k, v in counts.iter_rows()}
+
+    if comment := photons.comment:
+        info["comment"] = comment
+    return info

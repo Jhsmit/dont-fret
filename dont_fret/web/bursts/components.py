@@ -16,7 +16,7 @@ from solara.toestand import Ref
 from dont_fret.web.bursts.methods import create_histogram
 from dont_fret.web.components import RangeInputField
 from dont_fret.web.methods import chain_filters
-from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstItem, BurstPlotSettings
+from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
 from dont_fret.web.reactive import ReactiveFRETNodes
 from dont_fret.web.utils import not_none
 
@@ -328,7 +328,7 @@ def generate_figure(
 
 @solara.component
 def FileFilterDialog(
-    burst_item: solara.Reactive[BurstItem],
+    burst_item: solara.Reactive[BurstNode],
     on_close: Callable[[], None],
 ):
     all_files = sorted(burst_item.value.df["filename"].unique())

@@ -14,13 +14,13 @@ import dont_fret.web.state as state
 from dont_fret.web.bursts.components import BurstFigure
 from dont_fret.web.main import Page as MainPage
 from dont_fret.web.methods import batch_burst_search
-from dont_fret.web.models import FRETNode, PhotonFileItem
+from dont_fret.web.models import FRETNode, PhotonNode
 
 # %%
 
 ROOT = Path(__file__).parent.parent
 pth = ROOT / "tests" / "test_data" / "input" / "ds2"
-photon_file_items = [PhotonFileItem(file_path=ptu_pth) for ptu_pth in pth.glob("*.ptu")]
+photon_file_items = [PhotonNode(file_path=ptu_pth) for ptu_pth in pth.glob("*.ptu")]
 
 # %%
 

@@ -91,3 +91,27 @@ def RangeInputField(
             )
     else:
         text_field  # type: ignore
+
+
+@solara.component
+def EditableTitle(initial: str | solara.Reactive[str], edit: bool | solara.Reactive[bool] = False):
+    title = solara.use_reactive(initial)
+    edit_mode = solara.use_reactive(edit)
+
+    def on_edit(value: str):
+        edit_mode.set(False)
+        title.set(value)
+
+    def handle(*args):
+        if edit_mode.value:
+            return
+        edit_mode.set(True)
+
+    if edit_mode.value:
+        children = [solara.InputText(label="", value=title.value, on_value=on_edit)]
+
+    else:
+        children = [solara.Text(title.value)]
+
+    div = solara.Div(children=children)
+    solara.v.use_event(div, "dblclick", handle)

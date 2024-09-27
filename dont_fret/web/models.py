@@ -5,10 +5,11 @@ import uuid
 from collections import UserList
 from dataclasses import dataclass, field, make_dataclass
 from pathlib import Path
-from typing import Optional, Tuple, TypedDict
+from typing import Callable, Optional, Tuple, TypedDict, TypeVar
 
 import numpy as np
 import polars as pl
+import solara
 
 from dont_fret.config.config import BurstColor, BurstFilterItem
 from dont_fret.fileIO import PhotonFile
@@ -33,29 +34,10 @@ BURST_SCHEMA = {
 }
 
 
-# refactor: move to methods
-def get_info(photons: PhotonData) -> dict:
-    info = {}
-    info["creation_time"] = photons.metadata["creation_time"]
-    info["number_of_photons"] = len(photons)
-    info["acquisition_duration"] = photons.metadata["acquisition_duration"]
-    info["power_diode"] = photons.metadata["tags"]["UsrPowerDiode"]["value"]
-
-    info["cps"] = photons.cps
-    t_max = photons.photon_times.max()
-    counts = photons.data["stream"].value_counts(sort=True)
-    info["stream_cps"] = {k: v / t_max for k, v in counts.iter_rows()}
-
-    if comment := photons.comment:
-        info["comment"] = comment
-    return info
-
-
 @dataclasses.dataclass
-class PhotonFileItem:
+class PhotonNode:
     file_path: Path
     info: Optional[dict] = None
-    photons: Optional[PhotonData] = None
     id: uuid.UUID = dataclasses.field(default_factory=lambda: uuid.uuid4())
 
     @property
@@ -66,32 +48,44 @@ class PhotonFileItem:
     def size(self) -> int:
         return self.file_path.stat().st_size
 
-    def get_info(self) -> dict:
-        if self.info is None:
-            self.get_photons()
-            assert self.info is not None
-            return self.info
-        else:
-            return self.info
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, PhotonNode):
+            return False
+        return self.id == value.id
 
-    def get_photons(self) -> PhotonData:
-        """read the file if it hasn't been read yet, otherwise checks for cached rsult"""
 
-        if self.photons is not None:
-            return self.photons
-        # todo cachhe
-        # elif self.id in CHACHE:
-        #     return CHACHE[self.id]
-        else:
-            self.photons = PhotonData.from_file(PhotonFile(self.file_path))
-            self.info = get_info(self.photons)
-        return self.photons
+@dataclasses.dataclass
+class BurstNode:
+    name: str
+    df: pl.DataFrame
+    colors: list[BurstColor] = dataclasses.field(default_factory=list)
+    id: uuid.UUID = dataclasses.field(default_factory=lambda: uuid.uuid4())
 
-    def to_cache(self):
-        pass
+    photon_nodes: list[PhotonNode] = dataclasses.field(default_factory=list)
 
-    def from_cache(self):
-        pass
+    # @property
+    # def duration(self) -> Optional[float]:
+    #     durations = [m.get("acquisition_duration", None) for m in self.metadata.values()]
+    #     if len(set(durations)) == 1:
+    #         return durations[0]
+    #     else:
+    #         return None
+
+    # @classmethod
+    # def from_path(cls, path: Path) -> BurstNode:
+    #     # todo refactor via burst store
+    #     # todo add support for hdf5 files
+    #     if path.suffix == ".csv":
+    #         df = pl.read_csv(path)
+    #     elif path.suffix == ".pq":
+    #         df = pl.read_parquet(path)
+    #     else:
+    #         raise ValueError(f"Unsupported file type: {path.suffix}")
+
+    #     # convert the filename column to Enum dtype
+    #     df = df.with_columns(pl.col("filename").cast(pl.Enum(df["filename"].unique().sort())))
+
+    #     return cls(name=path.stem, df=df)
 
 
 # move to config ?
@@ -126,49 +120,6 @@ class BurstColorList(UserList[BurstColor]):
             spec[streams] = d
 
         return spec
-
-
-@dataclasses.dataclass
-class BurstItem:
-    name: str
-
-    df: pl.DataFrame
-
-    selected_files: list[str] = dataclasses.field(default_factory=list)
-
-    search_spec: Optional[dict[str, SearchParams]] = None
-    """Burst search settings used to generate the bursts"""
-
-    metadata: dict = field(default_factory=dict)
-
-    id: uuid.UUID = dataclasses.field(default_factory=lambda: uuid.uuid4())
-
-    def __post_init__(self):
-        if not self.selected_files:
-            self.selected_files = list(self.df["filename"].unique())
-
-    @property
-    def duration(self) -> Optional[float]:
-        durations = [m.get("acquisition_duration", None) for m in self.metadata.values()]
-        if len(set(durations)) == 1:
-            return durations[0]
-        else:
-            return None
-
-    @classmethod
-    def from_path(cls, path: Path) -> BurstItem:
-        # todo add support for hdf5 files
-        if path.suffix == ".csv":
-            df = pl.read_csv(path)
-        elif path.suffix == ".pq":
-            df = pl.read_parquet(path)
-        else:
-            raise ValueError(f"Unsupported file type: {path.suffix}")
-
-        # convert the filename column to Enum dtype
-        df = df.with_columns(pl.col("filename").cast(pl.Enum(df["filename"].unique().sort())))
-
-        return cls(name=path.stem, df=df)
 
 
 @dataclasses.dataclass
@@ -262,13 +213,20 @@ class TCSPCSettings:
     log_y: bool = True
 
 
-@dataclasses.dataclass
-class FRETNode:
-    name: str  # displayed name
-    id: str = dataclasses.field(default_factory=lambda: uuid.uuid4().hex)  # unique id
-    description: str = ""  # description of the node
-    photons: list[PhotonFileItem] = dataclasses.field(default_factory=list)
-    bursts: list[BurstItem] = dataclasses.field(default_factory=list)
+T = TypeVar("T")
+
+
+def reactive_factory(factory: Callable[[], T]) -> solara.Reactive[T]:
+    return solara.reactive(factory())
+
+
+# @dataclasses.dataclass
+# class FRETNode:
+#     name: str  # displayed name
+#     id: str = dataclasses.field(default_factory=lambda: uuid.uuid4().hex)  # unique id
+#     description: str = ""  # description of the node
+#     photons: list[PhotonFileItem] = dataclasses.field(default_factory=list)
+#     bursts: list[BurstItem] = dataclasses.field(default_factory=list)
 
 
 @dataclass

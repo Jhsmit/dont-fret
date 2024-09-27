@@ -15,7 +15,7 @@ from dont_fret import PhotonData, PhotonFile
 from dont_fret.web.bursts.components import BurstFigure
 from dont_fret.web.home.methods import task_burst_search
 from dont_fret.web.methods import burst_search, create_file_items
-from dont_fret.web.models import BurstItem, FRETNode, PhotonFileItem
+from dont_fret.web.models import BurstNode, FRETNode, PhotonNode
 
 cwd = Path(__file__).parent
 input_data_dir = cwd / "test_data" / "input"
@@ -31,13 +31,13 @@ def ph_ds1() -> PhotonData:
 
 
 @pytest.fixture
-def photon_file_items() -> List[PhotonFileItem]:
+def photon_file_items() -> List[PhotonNode]:
     file_items = create_file_items(input_data_dir / "ds1")
     return file_items
 
 
 @pytest.fixture
-def burst_items(photon_file_items: List[PhotonFileItem]) -> List[BurstItem]:
+def burst_items(photon_file_items: List[PhotonNode]) -> List[BurstNode]:
     burst_settings = ["DCBS", "APBS"]
     dtype = pl.Enum([item.name for item in photon_file_items])
 
@@ -47,13 +47,13 @@ def burst_items(photon_file_items: List[PhotonFileItem]) -> List[BurstItem]:
         dfs = [burst_search(f, name, dtype) for f in photon_file_items]
         df = pl.concat(dfs, how="vertical_relaxed")
 
-        burst_items.append(BurstItem(name=name, df=df))
+        burst_items.append(BurstNode(name=name, df=df))
     return burst_items
 
 
 @pytest.mark.asyncio
 async def test_burst_search(ph_ds1):
-    ph_item = PhotonFileItem(file_path=input_data_dir / "ds1" / "datafile_1.ptu")
+    ph_item = PhotonNode(file_path=input_data_dir / "ds1" / "datafile_1.ptu")
 
     node = FRETNode(
         name="FRET NOT",
