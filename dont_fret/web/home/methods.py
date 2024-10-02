@@ -6,7 +6,7 @@ import solara
 import solara.lab
 
 import dont_fret.web.state as state
-from dont_fret.web.methods import burst_search
+from dont_fret.web.methods import burst_search, get_duration
 from dont_fret.web.models import BurstNode, PhotonNode
 
 
@@ -24,7 +24,12 @@ async def task_burst_search(name: str, photon_nodes: list[PhotonNode], burst_sto
     if len(df) == 0:
         state.snackbar.warning("No bursts found", timeout=0)
     else:
-        burst_node = BurstNode(name=name, df=df, colors=burst_colors, photon_nodes=photon_nodes)
+        # getting info should be fast / non_blocking since photons are cached
+        info_list = [await state.data_manager.get_info(ph_node) for ph_node in photon_nodes]
+        duration = get_duration(info_list)
+        burst_node = BurstNode(
+            name=name, df=df, colors=burst_colors, photon_nodes=photon_nodes, duration=duration
+        )
         burst_store.append(burst_node)
 
         state.snackbar.success(

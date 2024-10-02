@@ -18,7 +18,7 @@ from dont_fret.config import cfg
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
-from dont_fret.web.methods import get_info
+from dont_fret.web.methods import get_duration, get_info
 from dont_fret.web.models import BurstColorList, BurstNode, PhotonNode
 
 if TYPE_CHECKING:
@@ -35,6 +35,9 @@ class ListStore(Generic[T]):
 
     def __len__(self):
         return len(self.items)
+
+    def __getitem__(self, idx: int) -> T:
+        return self.items[idx]
 
     @property
     def items(self):
@@ -146,77 +149,6 @@ class Cache(Generic[K, V]):
             self._cache.clear()
 
 
-# class PhotonCache:
-#     """responsible for loading a caching photon data"""
-
-#     def __init__(self):
-#         self._cache: OrderedDict[uuid.UUID, PhotonData] = OrderedDict()
-#         self.lock = threading.Lock()
-
-#     def __contains__(self, node: PhotonNode) -> bool:
-#         # or should we check for node.id?
-#         with self.lock:
-#             return node.id in self._cache
-
-#     def get(self, key: uuid.UUID) -> Optional[PhotonData]:
-#         with self.lock:
-#             if key in self._cache:
-#                 self._cache.move_to_end(key)
-#                 return self._cache[key]
-#             return None
-
-#     # TODO: this should be decoupled from the cache object
-#     # burst / photon cache should be the same object
-#     def get_photons(self, node: PhotonNode) -> PhotonData:
-#         photons = self.get(node.id)
-#         if photons is None:
-#             photons = PhotonData.from_file(PhotonFile(node.file_path))
-#             self.set(node.id, photons)
-
-#         return photons
-
-#     def get_info(self, node: PhotonNode) -> dict:
-#         if node.info is not None:
-#             return node.info
-#         else:
-#             photons = self.get_photons(node)
-#             info = get_info(photons)
-#             node.info = info
-#             return info
-
-
-# class BurstCache:
-#     def __init__(self):
-#         pass
-#         self.lock = threading.Lock()
-
-#         self._cache: OrderedDict[tuple[uuid.UUID, str], Bursts] = OrderedDict()
-
-#     # todo perhaps get/set should be in the form of:
-#     # get(node, burst_colors) -> Bursts
-#     def get(self, key: tuple[uuid.UUID, str]) -> Optional[Bursts]:
-#         with self.lock:
-#             if key in self._cache:
-#                 self._cache.move_to_end(key)
-#                 return self._cache[key]
-#             return None
-
-#     def set(self, key: tuple[uuid.UUID, str], value: Bursts) -> None:
-#         with self.lock:
-#             self._cache[key] = value
-#             self._cache.move_to_end(key)  # in case it already existed
-
-#     def clear(self) -> None:
-#         with self.lock:
-#             self._cache.clear()
-
-#     # TODO the key depends on color order while burst search (should) not depend on order
-#     @staticmethod
-#     def make_key(photon_node: PhotonNode, burst_colors: list[BurstColor]) -> tuple[uuid.UUID, str]:
-#         s = json.dumps([dataclasses.asdict(c) for c in burst_colors])
-#         return (photon_node.id, s)
-
-
 T = TypeVar("T")
 P = ParamSpec("P")
 
@@ -262,10 +194,7 @@ class ThreadedDataManager:
         self,
         photon_node: PhotonNode,
         burst_colors: list[BurstColor],
-        loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> Bursts:
-        loop = loop or asyncio.get_running_loop()
-
         key = self.burst_key(photon_node, burst_colors)
         bursts = self.burst_cache.get(key)
         if bursts is None:
@@ -274,31 +203,27 @@ class ThreadedDataManager:
 
         return bursts
 
-    async def burst_search(
+    async def get_bursts_batch(
         self,
         photon_nodes: list[PhotonNode],
         burst_colors: list[BurstColor],
         on_progress: Optional[Callable[[float | bool], None]] = None,
-        loop: Optional[asyncio.AbstractEventLoop] = None,
-    ):
-        loop = loop or asyncio.get_running_loop()
+    ) -> list[Bursts]:
         on_progress = on_progress or (lambda _: None)
 
-        # TODO we are checking todo / done twice, get_dataframe and here
-        all_keys = [self.burst_key(ph_node, burst_colors) for ph_node in photon_nodes]
-        todo_keys = [k for k in all_keys if k not in self.burst_cache]
-
         tasks = []
-        for k in todo_keys:
-            idx = all_keys.index(k)
-            ph_node = photon_nodes[idx]
-            task = asyncio.create_task(self.search(ph_node, burst_colors))
+        for ph_node in photon_nodes:
+            task = asyncio.create_task(self.get_bursts(ph_node, burst_colors))
             tasks.append(task)
 
+        results = []
         for i, f in enumerate(asyncio.as_completed(tasks)):
-            await f
+            result = await f
+            results.append(result)
             progress = (i + 1) * (100 / len(tasks))
             on_progress(progress)
+
+        return results
 
     async def search(self, node: PhotonNode, colors: list[BurstColor]) -> Bursts:
         """performs burst search and stores the result in the burst cache"""
@@ -314,7 +239,6 @@ class ThreadedDataManager:
         photon_nodes: list[PhotonNode],
         burst_colors: list[BurstColor],
         on_progress: Optional[Callable[[float | bool], None]] = None,
-        loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> pl.DataFrame:
         on_progress = on_progress or (lambda _: None)
         on_progress(True)
@@ -327,7 +251,7 @@ class ThreadedDataManager:
         todo_nodes = [photon_nodes[all_keys.index(k)] for k in todo_keys]
 
         if todo_nodes:
-            await self.burst_search(todo_nodes, burst_colors, on_progress, loop)
+            await self.get_bursts_batch(todo_nodes, burst_colors, on_progress)
         on_progress(True)
 
         # gather all bursts, combine into a dataframe
@@ -345,3 +269,117 @@ class ThreadedDataManager:
         )
 
         return df
+
+    async def get_burst_node(
+        self,
+        photon_nodes: list[PhotonNode],
+        burst_colors: list[BurstColor],
+        name: str = "",
+        on_progress: Optional[Callable[[float | bool], None]] = None,
+    ) -> BurstNode:
+        burst_df = await self.get_dataframe(photon_nodes, burst_colors, on_progress=on_progress)
+        info_list = [await self.get_info(node) for node in photon_nodes]
+
+        duration = get_duration(info_list)
+        uu_id = uuid.uuid4()
+
+        node = BurstNode(
+            name=name or f"burst_node-{id}",
+            df=burst_df,
+            colors=burst_colors,
+            photon_nodes=photon_nodes,
+            duration=duration,
+            id=uu_id,
+        )
+
+        return node
+
+
+import asyncio
+import threading
+from functools import wraps
+from typing import Callable, Optional, Union
+
+
+class SyncDataManager:
+    def __init__(self):
+        self._async_manager = ThreadedDataManager()
+        self._loop = None
+        self._loop_thread = None
+
+    def _ensure_loop(self):
+        if self._loop is None:
+            self._loop = asyncio.new_event_loop()
+            self._loop_thread = threading.Thread(target=self._run_loop, daemon=True)
+            self._loop_thread.start()
+
+    def _run_loop(self):
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_forever()
+
+    def _run_async(self, coro):
+        self._ensure_loop()
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result()
+
+    @staticmethod
+    def _sync_wrapper(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            return self._run_async(getattr(self._async_manager, func.__name__)(*args, **kwargs))
+
+        return wrapper
+
+    @_sync_wrapper
+    def get_photons(self, node: PhotonNode) -> PhotonData:
+        pass
+
+    @_sync_wrapper
+    def get_info(self, node: PhotonNode) -> dict:
+        pass
+
+    @_sync_wrapper
+    def get_bursts(self, photon_node: PhotonNode, burst_colors: list[BurstColor]) -> Bursts:
+        pass
+
+    @_sync_wrapper
+    def get_bursts_batch(
+        self,
+        photon_nodes: list[PhotonNode],
+        burst_colors: list[BurstColor],
+        on_progress: Optional[Callable[[float | bool], None]] = None,
+    ) -> list[Bursts]:
+        pass
+
+    @_sync_wrapper
+    def search(self, node: PhotonNode, colors: list[BurstColor]) -> Bursts:
+        pass
+
+    @_sync_wrapper
+    def get_dataframe(
+        self,
+        photon_nodes: list[PhotonNode],
+        burst_colors: list[BurstColor],
+        on_progress: Optional[Callable[[float | bool], None]] = None,
+    ) -> "pl.DataFrame":
+        pass
+
+    @_sync_wrapper
+    def get_burst_node(
+        self,
+        photon_nodes: list[PhotonNode],
+        burst_colors: list[BurstColor],
+        name: str = "",
+        on_progress: Optional[Callable[[float | bool], None]] = None,
+    ) -> "BurstNode":
+        pass
+
+    def burst_key(self, node: PhotonNode, burst_colors: list[BurstColor]) -> tuple[uuid.UUID, str]:
+        return self._async_manager.burst_key(node, burst_colors)
+
+    def __del__(self):
+        if self._loop and not self._loop.is_closed():
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            if self._loop_thread:
+                self._loop_thread.join()
+            self._loop.close()

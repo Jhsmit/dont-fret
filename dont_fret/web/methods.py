@@ -32,6 +32,7 @@ def batch_burst_search(
     """
     Search all photon file items in batch threaded.
     """
+    raise DeprecationWarning("use data manager")
     dtype = pl.Enum([item.name for item in photon_file_items])
 
     futures = []
@@ -49,6 +50,7 @@ def batch_burst_search(
 def burst_search(
     ph_file_item: PhotonNode, burst_colors: str | list[BurstColor], dtype: pl.Enum
 ) -> pl.DataFrame:
+    raise DeprecationWarning("use data manager instead")
     photons = ph_file_item.get_photons()
     bursts = photons.burst_search(burst_colors)
 
@@ -102,11 +104,12 @@ def get_duration(metadata: list[dict]) -> Optional[float]:
     are all equal, otherwise returns `None`
     """
 
-    durations = [m.get("acquisition_duration", None) for m in metadata]
-    if len(set(durations)) == 1:
-        return durations[0]
-    else:
+    durations = {m.get("acquisition_duration", None) for m in metadata}
+    if None in durations:
         return None
+    elif len(durations) != 1:
+        return None
+    return durations.pop()
 
 
 def format_size(size_in_bytes: int) -> str:

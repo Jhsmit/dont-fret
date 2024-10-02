@@ -87,7 +87,7 @@ class TreeSelection:
             raise ValueError(f"Invalid node_type: {self.node_type}")
 
 
-@solara.component
+@solara.component  # type: ignore
 def HomePage():
     if len(state.fret_nodes) == 0:
         state.fret_nodes.new_node()
@@ -149,12 +149,12 @@ def HomePage():
                 assert isinstance(photon_node, PhotonNode)
                 fret_node = selection.fret_node
 
-                def on_delete(p_node_idx=selection.d_idx):
+                def delete_photon(p_node_idx=selection.d_idx):
                     # set the active id to the parent node before deleting
                     active_id.set([f"{selection.f_idx}:{selection.node_type}"])
                     fret_node.photons.pop(p_node_idx)  # type: ignore
 
-                PhotonNodeInfoCard(fret_node.name.value, photon_node, on_delete)
+                PhotonNodeInfoCard(fret_node.name.value, photon_node, delete_photon)
 
             case TreeSelection(f_idx=int(), node_type="bursts", d_idx=int()):
                 burst_node = selection.data_node
@@ -162,9 +162,9 @@ def HomePage():
 
                 fret_node = selection.fret_node
 
-                def on_delete(b_node_idx=selection.d_idx):
+                def delete_burst(b_node_idx=selection.d_idx):
                     # set the active id to the parent node before deleting
                     active_id.set([f"{selection.f_idx}:{selection.node_type}"])
                     fret_node.bursts.pop(b_node_idx)  # type: ignore
 
-                BurstItemInfoCard(fret_node.name.value, burst_node, on_delete)
+                BurstItemInfoCard(fret_node.name.value, burst_node, delete_burst)

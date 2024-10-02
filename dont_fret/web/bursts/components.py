@@ -17,6 +17,7 @@ from dont_fret.web.bursts.methods import create_histogram
 from dont_fret.web.components import RangeInputField
 from dont_fret.web.methods import chain_filters
 from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
+from dont_fret.web.new_models import FRETNode, FRETStore
 from dont_fret.web.reactive import ReactiveFRETNodes
 from dont_fret.web.utils import not_none
 
@@ -546,10 +547,9 @@ def PlotSettingsEditDialog(
             solara.Button("Close", icon_name="mdi-window-close", on_click=on_close)
 
 
-# burst item model could have plotsettings instance as child to keep the state
 @solara.component
-def BurstFigure(
-    fret_nodes: ReactiveFRETNodes,
+def BurstFigureDepr(
+    fret_nodes: list[FRETNode],  # can be only the value since it doesnt edit the nodes
     global_filters: solara.Reactive[list[BurstFilterItem]],
     node_idx: Optional[solara.Reactive[int]] = None,
     burst_idx: Optional[solara.Reactive[int]] = None,
@@ -577,7 +577,7 @@ def BurstFigure(
     file_filter = pl.col("filename").is_in(burst_ref.value.selected_files)
     f_expr = chain_filters(global_filters.value) & file_filter
 
-    # this is triggered twice ?
+    # this is triggered twice ? -> known plotly bug
     def redraw():
         filtered_df = burst_ref.value.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
@@ -646,3 +646,107 @@ def BurstFigure(
                     burst_item=burst_ref,
                     on_close=lambda: set_edit_filter(False),
                 )
+
+
+# burst item model could have plotsettings instance as child to keep the state
+@solara.component
+def BurstFigure(
+    fret_nodes: list[FRETNode],  # can be only the value since it doesnt edit the nodes
+    global_filters: solara.Reactive[list[BurstFilterItem]],
+    node_idx: Optional[solara.Reactive[int]] = None,
+    burst_idx: Optional[solara.Reactive[int]] = None,
+):
+    # we are only interested in nodes with bursts
+    has_nodes = [node for node in fret_nodes if node.bursts.items]
+    node_idx = solara.use_reactive(node_idx if node_idx is not None else 0)
+    burst_idx = solara.use_reactive(burst_idx if burst_idx is not None else 0)
+
+    fret_node = has_nodes[node_idx.value]
+    burst_node = fret_node.bursts[burst_idx.value]
+
+    # selector options
+    fret_node_values = [{"text": node.name.value, "value": i} for i, node in enumerate(has_nodes)]
+    burst_node_values = [
+        {"text": burst_node.name, "value": i} for i, burst_node in enumerate(fret_node.bursts.items)
+    ]
+
+    figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
+    edit_filter, set_edit_filter = solara.use_state(False)
+    edit_settings, set_edit_settings = solara.use_state(False)
+    plot_settings = solara.use_reactive(BurstPlotSettings())
+
+    dark_effective = solara.lab.use_dark_effective()
+
+    # file_filter = pl.col("filename").is_in(burst_ref.value.selected_files)
+    f_expr = chain_filters(global_filters.value)  # & file_filter
+
+    # this is triggered twice ? -> known plotly bug
+    def redraw():
+        filtered_df = burst_node.df.filter(f_expr)
+        img = BinnedImage.from_settings(filtered_df, plot_settings.value)
+        figure = generate_figure(
+            filtered_df, plot_settings.value, binned_image=img, dark=dark_effective
+        )
+        set_figure(figure)
+
+    # does hashability matter in speed?
+    fig_result = solara.use_thread(
+        redraw,
+        dependencies=[
+            node_idx.value,
+            burst_idx.value,
+            plot_settings.value,
+            global_filters.value,
+            dark_effective,
+        ],
+        intrusive_cancel=False,  # is much faster
+    )
+
+    def on_fret_node(value: int):
+        node_idx.set(value)
+        burst_idx.set(0)
+
+    print(fret_node_values)
+    with solara.Card():
+        with solara.Row():
+            solara.Select(
+                label="Measurement",
+                value=node_idx.value,
+                on_value=on_fret_node,  # type: ignore
+                values=fret_node_values,  # type: ignore
+            )
+
+            solara.Select(
+                label="Burst item",
+                value=burst_idx.value,
+                on_value=burst_idx.set,
+                values=burst_node_values,  # type: ignore
+            )
+
+            solara.IconButton(icon_name="mdi-file-star", on_click=lambda: set_edit_filter(True))
+            solara.IconButton(icon_name="mdi-settings", on_click=lambda: set_edit_settings(True))
+
+        solara.ProgressLinear(fig_result.state == solara.ResultState.RUNNING)
+        if figure is not None:
+            with solara.Div(
+                style="opacity: 0.3" if fig_result.state == solara.ResultState.RUNNING else None
+            ):
+                solara.FigurePlotly(figure)
+
+        # dedent this and figure will flicker/be removed when opening the dialog
+        if edit_settings:
+            with rv.Dialog(v_model=edit_settings, max_width=750, on_v_model=set_edit_settings):
+                PlotSettingsEditDialog(
+                    plot_settings,
+                    burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
+                    on_close=lambda: set_edit_settings(False),
+                    duration=burst_node.duration,
+                )
+
+        if edit_filter:
+            pass
+            # with rv.Dialog(v_model=edit_filter, max_width=750, on_v_model=set_edit_filter):
+            #     FileFilterDialog(
+            #         burst_item=burst_ref,
+            #         on_close=lambda: set_edit_filter(False),
+            #     )

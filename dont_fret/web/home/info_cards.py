@@ -1,5 +1,6 @@
 """Solara components for the home page."""
 
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -227,7 +228,7 @@ def PhotonInfoCard(
         BurstSettingsDialog(burst_settings, bs_name, on_close=set_show_settings_dialog)
 
 
-@solara.component
+@solara.component  # type: ignore
 def BurstInfoCard(
     name: str,
     burst_store: ListStore[BurstNode],
@@ -261,7 +262,8 @@ def BurstInfoCard(
             return
 
         # TODO via dataloader object
-        burst_store.extend([BurstNode.from_path(burst_pth)])
+        raise NotImplementedError("TODO via dataloader object")
+        # burst_store.extend([BurstNode.from_path(burst_pth)])
 
     with solara.Card(f"{name} / Bursts"):
         solara.Text("Click files to add")
@@ -379,8 +381,8 @@ def PhotonNodeInfoCard(node_name: str, photon_node: PhotonNode, on_delete: Calla
             solara.IconButton("delete", on_click=lambda *args: on_delete())
 
 
-@solara.component
-def BurstItemInfoCard(node_name: str, burst_item: BurstNode, on_delete: Callable[[], None]):
+@solara.component  # type: ignore
+def BurstItemInfoCard(node_name: str, burst_node: BurstNode, on_delete: Callable[[], None]):
     headers = [
         {"text": "Filename", "value": "filename"},
         {"text": "Number of bursts", "value": "bursts"},
@@ -391,11 +393,11 @@ def BurstItemInfoCard(node_name: str, burst_item: BurstNode, on_delete: Callable
         {"text": "In-burst countrate (kHz)", "value": "burst_cps"},
     ]
 
-    filenames = burst_item.df["filename"].unique().sort()
+    filenames = burst_node.df["filename"].unique().sort()
     items = []
     for fname in filenames:
         item = {"filename": fname}
-        df = burst_item.df.filter(pl.col("filename") == fname)
+        df = burst_node.df.filter(pl.col("filename") == fname)
 
         item["bursts"] = len(df)
 
@@ -417,8 +419,8 @@ def BurstItemInfoCard(node_name: str, burst_item: BurstNode, on_delete: Callable
         burst_cps = df["n_photons"] / df["time_length"]
         item["burst_cps"] = f"{burst_cps.mean()*1e-3:.2f} ± {burst_cps.std()*1e-3:.2f}"  # type: ignore
 
-    with solara.Card(f"{node_name} / Bursts / {burst_item.name}"):
-        solara.Text(f"Total number of bursts: {len(burst_item.df)}", style="font-weight: bold;")
+    with solara.Card(f"{node_name} / Bursts / {burst_node.name}"):
+        solara.Text(f"Total number of bursts: {len(burst_node.df)}", style="font-weight: bold;")
         solara.HTML(tag="br")
         solara.Text("Bursts statistics per file:")
 
@@ -431,8 +433,8 @@ def BurstItemInfoCard(node_name: str, burst_item: BurstNode, on_delete: Callable
 
         with solara.CardActions():
             solara.FileDownload(
-                burst_item.df.write_csv,
-                filename=f"{burst_item.name}_bursts.csv",
+                burst_node.df.write_csv,
+                filename=f"{burst_node.name}_bursts.csv",
                 children=[
                     solara.Button(
                         "Download burst data.csv",
@@ -441,8 +443,8 @@ def BurstItemInfoCard(node_name: str, burst_item: BurstNode, on_delete: Callable
                 ],
             )
             solara.FileDownload(
-                lambda: yaml.dump(burst_item.search_spec),
-                filename=f"{burst_item.name}_setttings.yaml",
+                lambda: yaml.dump(yaml.dump([asdict(c) for c in burst_node.colors])),
+                filename=f"{burst_node.name}_setttings.yaml",
                 children=[
                     solara.Button(
                         "Download settings",

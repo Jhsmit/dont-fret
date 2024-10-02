@@ -62,30 +62,7 @@ class BurstNode:
     id: uuid.UUID = dataclasses.field(default_factory=lambda: uuid.uuid4())
 
     photon_nodes: list[PhotonNode] = dataclasses.field(default_factory=list)
-
-    # @property
-    # def duration(self) -> Optional[float]:
-    #     durations = [m.get("acquisition_duration", None) for m in self.metadata.values()]
-    #     if len(set(durations)) == 1:
-    #         return durations[0]
-    #     else:
-    #         return None
-
-    # @classmethod
-    # def from_path(cls, path: Path) -> BurstNode:
-    #     # todo refactor via burst store
-    #     # todo add support for hdf5 files
-    #     if path.suffix == ".csv":
-    #         df = pl.read_csv(path)
-    #     elif path.suffix == ".pq":
-    #         df = pl.read_parquet(path)
-    #     else:
-    #         raise ValueError(f"Unsupported file type: {path.suffix}")
-
-    #     # convert the filename column to Enum dtype
-    #     df = df.with_columns(pl.col("filename").cast(pl.Enum(df["filename"].unique().sort())))
-
-    #     return cls(name=path.stem, df=df)
+    duration: Optional[float] = None
 
 
 # move to config ?
