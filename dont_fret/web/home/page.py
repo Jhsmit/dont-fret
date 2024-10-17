@@ -40,6 +40,8 @@ open_ = solara.Reactive(cast(list[str], []))
 active_id = solara.Reactive(cast(list[str], []))
 
 
+# TODO there are now 3 selection classes
+# perhaps they can be generalized
 @dataclass
 class TreeSelection:
     f_idx: Optional[int] = None
@@ -113,7 +115,7 @@ def HomePage():
                 )
 
         selection = TreeSelection.from_string(active_id.value[0] if active_id.value else "")
-
+        # TODO this selection suses indices while later we use uuid's
         match selection:
             case TreeSelection(f_idx=None, node_type=None, d_idx=None):
                 with solara.Card():
@@ -137,7 +139,7 @@ def HomePage():
                     state.burst_settings,
                 )
             case TreeSelection(f_idx=int(), node_type="bursts", d_idx=None):
-                # TODO
+                # TODO open_
                 BurstInfoCard(
                     selection.fret_node.name.value,
                     selection.fret_node.bursts,

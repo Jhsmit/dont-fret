@@ -149,6 +149,45 @@ class Cache(Generic[K, V]):
             self._cache.clear()
 
 
+# claude suggestiosn for locks on photon items:
+# import asyncio
+# import uuid
+# from concurrent.futures import ThreadPoolExecutor
+# from typing import Dict
+
+# from your_module import Cache, PhotonData, PhotonNode, PhotonFile
+
+# class ThreadedDataManager:
+#     def __init__(self, max_workers: int = 4) -> None:
+#         self.photon_cache = Cache[uuid.UUID, PhotonData]()
+#         self.burst_cache = Cache[tuple[uuid.UUID, str], Bursts]()
+#         self.executor = ThreadPoolExecutor(max_workers=max_workers)
+#         self._loop = None
+#         self.photon_locks: Dict[uuid.UUID, asyncio.Lock] = {}
+
+#     @property
+#     def loop(self) -> asyncio.AbstractEventLoop:
+#         if self._loop is None:
+#             self._loop = asyncio.get_event_loop()
+#         return self._loop
+
+#     def run(self, func, *args):
+#         return self.loop.run_in_executor(self.executor, func, *args)
+
+#     async def get_photons(self, node: PhotonNode) -> PhotonData:
+#         if node.id not in self.photon_locks:
+#             self.photon_locks[node.id] = asyncio.Lock()
+
+#         async with self.photon_locks[node.id]:
+#             photons = self.photon_cache.get(node.id)
+#             if photons is None:
+#                 photons = await self.run(PhotonData.from_file, PhotonFile(node.file_path))
+#                 self.photon_cache.set(node.id, photons)
+
+#         return photons
+
+# ... (rest of the class remains the same)
+
 T = TypeVar("T")
 P = ParamSpec("P")
 
@@ -169,6 +208,8 @@ class ThreadedDataManager:
         return self.loop.run_in_executor(self.executor, func, *args)
 
     async def get_photons(self, node: PhotonNode) -> PhotonData:
+        # TODO if another thread is already generating these photons it should wait for
+        # that task to finish
         photons = self.photon_cache.get(node.id)
         if photons is None:
             photons = await self.run(PhotonData.from_file, PhotonFile(node.file_path))

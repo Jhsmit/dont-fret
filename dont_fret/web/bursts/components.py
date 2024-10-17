@@ -557,6 +557,7 @@ def SelectCount(label, value, on_value, items, item_name="item"):
 T = TypeVar("T")
 
 
+# move to utils
 def find_object(items: list[T], **kwargs) -> T:
     for item in items:
         if all(getattr(item, key) == value for key, value in kwargs.items()):
@@ -568,6 +569,7 @@ def find_object(items: list[T], **kwargs) -> T:
 class BurstFigureSelection:
     fret_store: FRETStore
 
+    # TODO make sure it can not be None
     fret_id: solara.Reactive[uuid.UUID | None] = field(
         default_factory=lambda: solara.reactive(None)
     )
@@ -709,7 +711,7 @@ def BurstFigure(
     with solara.Card():
         with solara.Row():
             solara.Select(
-                label="Measurement",
+                label="Measurement",  # TODO refactor to FRET node?
                 value=selection.fret_id.value.hex,
                 on_value=selection.set_fret_id,  # type: ignore
                 values=selection.fret_values,  # type: ignore

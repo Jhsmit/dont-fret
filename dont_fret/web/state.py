@@ -12,6 +12,7 @@ from dont_fret.web.bursts.components import BurstFigureSelection
 from dont_fret.web.models import BurstColorList, BurstNode, PhotonNode
 from dont_fret.web.new_models import FRETStore, ThreadedDataManager
 from dont_fret.web.reactive import BurstSettingsReactive, ReactiveFRETNodes, SnackbarReactive
+from dont_fret.web.trace.page import PhotonNodeSelection
 
 APP_TITLE = "Don't FRET!"
 # fret_nodes = ReactiveFRETNodes([])
@@ -37,6 +38,8 @@ burst_figure_selection = [
     BurstFigureSelection(fret_nodes),
     BurstFigureSelection(fret_nodes),
 ]
+
+trace_selection = PhotonNodeSelection(fret_nodes)
 
 # cfg set to dask manager
 data_manager = ThreadedDataManager()

@@ -1,8 +1,11 @@
+import uuid
+from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Optional, cast
 
 import pandas as pd
 import plotly.graph_objects as go
+import polars as pl
 import solara
 import solara.lab
 from solara.alias import rv
@@ -10,8 +13,10 @@ from solara.alias import rv
 import dont_fret.web.state as state
 from dont_fret import BinnedPhotonData, PhotonData
 from dont_fret.formatting import TRACE_COLORS, TRACE_SIGNS
+from dont_fret.web.bursts.components import find_object
 from dont_fret.web.methods import generate_traces
-from dont_fret.web.models import TCSPCSettings, TraceSettings
+from dont_fret.web.models import BurstNode, PhotonNode, TCSPCSettings, TraceSettings
+from dont_fret.web.new_models import FRETNode, FRETStore
 from dont_fret.web.trace.methods import create_tcspc_histogram
 
 # TODO move fret node / photon file reactives to module level
@@ -20,7 +25,7 @@ MAX_DATAPOINTS = 100_000
 
 
 @solara.component
-def TCSPCFigure(photons: PhotonData, title: str):
+def TCSPCFigureDEPR(photons: PhotonData, title: str):
     settings = TCSPC_SETTINGS.value  # not really need in the global state
     figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
     dark_effective = solara.lab.use_dark_effective()
@@ -55,8 +60,154 @@ def to_csv(traces: dict[str, BinnedPhotonData], name: str) -> BytesIO:
     return bio
 
 
+# TODO looks a lot like burst selection
+@dataclass
+class PhotonNodeSelection:
+    fret_store: FRETStore
+
+    # TODO make sure it can not be None
+    fret_id: solara.Reactive[uuid.UUID | None] = field(
+        default_factory=lambda: solara.reactive(None)
+    )
+    photon_id: solara.Reactive[uuid.UUID | None] = field(
+        default_factory=lambda: solara.reactive(None)
+    )
+
+    def __post_init__(self):
+        self.fret_store._items.subscribe(self.on_fret_store)
+        self.reset()
+
+    def on_fret_store(self, new_value: list[FRETNode]):
+        options = [fret_node.id for fret_node in new_value]
+        if self.fret_id.value not in options:
+            self.reset()
+
+    def reset(self):
+        if self.has_photons:
+            fret_node = self.fret_nodes_with_photons[0]
+            self.set_fret_id(fret_node.id.hex)
+        else:
+            self.fret_id.set(None)
+            self.photon_id.set(None)
+
+    @property
+    def is_set(self) -> bool:
+        return bool(self.fret_id.value) and bool(self.photon_id.value)
+
+    @property
+    def fret_nodes_with_photons(self) -> list[FRETNode]:
+        return [node for node in self.fret_store if node.photons]
+
+    @property
+    def has_photons(self) -> bool:
+        return bool(self.fret_nodes_with_photons)
+
+    @property
+    def fret_node(self) -> FRETNode:
+        return find_object(self.fret_nodes_with_photons, id=self.fret_id.value)
+
+    def set_fret_id(self, value: str):
+        self.fret_id.set(uuid.UUID(value))
+
+        # set the first photon node as the default value
+        photon_node = self.fret_node.photons[0]
+        self.photon_id.set(photon_node.id)
+
+    @property
+    def fret_values(self) -> list[dict]:
+        return [
+            {"text": node.name.value, "value": node.id.hex} for node in self.fret_nodes_with_photons
+        ]
+
+    @property
+    def photon_node(self) -> PhotonNode:
+        return find_object(self.fret_node.photons.items, id=self.photon_id.value)
+
+    def set_photon_id(self, value: str):
+        self.photon_id.set(uuid.UUID(value))
+
+    @property
+    def photon_values(self) -> list[dict]:
+        return [{"text": node.name, "value": node.id.hex} for node in self.fret_node.photons]
+
+
 @solara.component
 def TracePage():
+    solara.Title(f"{state.APP_TITLE} / Trace")
+
+    # photons, set_photons = solara.use_state(cast(Optional[ChannelPhotonData], None))
+    TRACE_SETTINGS: solara.Reactive[TraceSettings] = solara.use_reactive(TraceSettings())
+
+    solara.Text("Number of nodes: {}".format(len(state.fret_nodes.items)))
+
+    async def load_info():
+        photons = await state.data_manager.get_photons(state.trace_selection.photon_node)
+        return photons
+
+    # result = solara.lab.use_task(load_info, dependencies=[photon_node], prefer_threaded=False)
+    # load_photons = solara.use_task()
+
+    solara.Select(
+        label="Measurement",
+        value=state.trace_selection.fret_id.value.hex,
+        on_value=state.trace_selection.set_fret_id,  # type: ignore
+        values=state.trace_selection.fret_values,  # type: ignore
+    )
+
+    solara.Select(
+        label="Photons",
+        value=state.trace_selection.photon_id.value.hex,
+        on_value=state.trace_selection.set_photon_id,  # type: ignore
+        values=state.trace_selection.photon_values,  # type: ignore
+    )
+
+    TCSPCFigure(state.trace_selection.photon_node)
+
+
+@solara.component
+def TCSPCFigure(photon_node: PhotonNode):
+    # todo move settings
+    settings = TCSPC_SETTINGS.value
+    dark_effective = solara.lab.use_dark_effective()
+
+    # TODO make binning step also async / threaded
+    async def redraw():
+        photons = await state.data_manager.get_photons(photon_node)
+        if photons.nanotimes_unit is None:
+            raise ValueError("Provided photon data does not have TCSPC information.")
+        fig = go.Figure()
+        for stream in TRACE_COLORS:
+            x, y = (
+                photons.data.filter(pl.col("stream") == stream)["nanotimes"]
+                .value_counts()
+                .sort(pl.col("nanotimes"))
+            )
+
+            line = dict(color=TRACE_COLORS[stream])
+            fig.add_trace(go.Scatter(x=x, y=y, mode="lines", line=line, name=stream))
+
+        fig.update_layout(
+            xaxis_title="Time (ns)",
+            yaxis_title="Photons per bin",
+            template="plotly_dark" if dark_effective else "plotly_white",
+        )
+
+        if settings.log_y:
+            fig.update_yaxes(type="log")
+
+        return fig
+
+    figure_task = solara.lab.use_task(redraw, dependencies=[photon_node, settings, dark_effective])
+
+    if figure_task.finished:
+        solara.FigurePlotly(figure_task.result.value)
+
+    else:
+        solara.Text("loading...")
+
+
+@solara.component
+def TracePageDepr():
     solara.Title(f"{state.APP_TITLE} / Trace")
 
     # photons, set_photons = solara.use_state(cast(Optional[ChannelPhotonData], None))
