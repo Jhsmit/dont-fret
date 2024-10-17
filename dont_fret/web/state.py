@@ -8,6 +8,7 @@ import solara
 from attrs import define, field
 
 from dont_fret.config import cfg
+from dont_fret.web.bursts.components import BurstFigureSelection
 from dont_fret.web.models import BurstColorList, BurstNode, PhotonNode
 from dont_fret.web.new_models import FRETStore, ThreadedDataManager
 from dont_fret.web.reactive import BurstSettingsReactive, ReactiveFRETNodes, SnackbarReactive
@@ -22,18 +23,20 @@ filters = solara.Reactive(copy.deepcopy(cfg.web.burst_filters))
 snackbar = SnackbarReactive()
 
 # selections for burst figures (node, burst)
-burst_figure_selection = [
-    (solara.Reactive(0), solara.Reactive(0)),
-    (solara.Reactive(0), solara.Reactive(0)),
-]
+
 
 # TODO reactive classes should have front end stuff ONLY
 # no photons. just their names
 # then we dont have to have burst search method for headless and web seperately
 
 
+# TODO refactor fret_store
 fret_nodes = FRETStore([])
 
+burst_figure_selection = [
+    BurstFigureSelection(fret_nodes),
+    BurstFigureSelection(fret_nodes),
+]
 
 # cfg set to dask manager
 data_manager = ThreadedDataManager()

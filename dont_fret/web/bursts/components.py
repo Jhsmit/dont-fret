@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
-from typing import Callable, Literal, Optional, cast
+import uuid
+from dataclasses import dataclass, field
+from typing import Callable, Literal, Optional, TypeVar, cast
 
 import numpy as np
 import plotly.express as px
@@ -547,80 +549,186 @@ def PlotSettingsEditDialog(
             solara.Button("Close", icon_name="mdi-window-close", on_click=on_close)
 
 
-@solara.component
-def BurstFigureDepr(
-    fret_nodes: list[FRETNode],  # can be only the value since it doesnt edit the nodes
-    global_filters: solara.Reactive[list[BurstFilterItem]],
-    node_idx: Optional[solara.Reactive[int]] = None,
-    burst_idx: Optional[solara.Reactive[int]] = None,
-):
-    node_idx = solara.use_reactive(node_idx if node_idx is not None else 0)
-    burst_idx = solara.use_reactive(burst_idx if burst_idx is not None else 0)
+@solara.component_vue("select_count.vue")
+def SelectCount(label, value, on_value, items, item_name="item"):
+    pass
 
+
+T = TypeVar("T")
+
+
+def find_object(items: list[T], **kwargs) -> T:
+    for item in items:
+        if all(getattr(item, key) == value for key, value in kwargs.items()):
+            return item
+    raise ValueError("Object not found")
+
+
+@dataclass
+class BurstFigureSelection:
+    fret_store: FRETStore
+
+    fret_id: solara.Reactive[uuid.UUID | None] = field(
+        default_factory=lambda: solara.reactive(None)
+    )
+    burst_id: solara.Reactive[uuid.UUID | None] = field(
+        default_factory=lambda: solara.reactive(None)
+    )
+
+    # keys are tuple of (fret_id, burst_id)
+    # values are hex values of the photon item uuids
+    selection_store: solara.Reactive[dict[tuple[uuid.UUID, uuid.UUID], list[str]]] = field(
+        default_factory=lambda: solara.reactive({})
+    )
+
+    def __post_init__(self):
+        self.fret_store._items.subscribe(self.on_fret_store)
+        self.reset()
+
+    def on_fret_store(self, new_value: list[FRETNode]):
+        options = [fret_node.id for fret_node in new_value]
+        if self.fret_id.value not in options:
+            self.reset()
+
+    def reset(self):
+        if self.has_bursts:
+            fret_node = self.fret_nodes_with_bursts[0]
+            self.set_fret_id(fret_node.id.hex)
+        else:
+            self.fret_id.set(None)
+            self.burst_id.set(None)
+
+    @property
+    def is_set(self) -> bool:
+        return bool(self.fret_id.value) and bool(self.burst_id.value)
+
+    @property
+    def fret_nodes_with_bursts(self) -> list[FRETNode]:
+        return [node for node in self.fret_store if node.bursts]
+
+    @property
+    def has_bursts(self) -> bool:
+        return bool(self.fret_nodes_with_bursts)
+
+    @property
+    def fret_values(self) -> list[dict]:
+        return [
+            {"text": node.name.value, "value": node.id.hex} for node in self.fret_nodes_with_bursts
+        ]
+
+    @property
+    def burst_values(self) -> list[dict]:
+        return [{"text": node.name, "value": node.id.hex} for node in self.fret_node.bursts]
+
+    @property
+    def fret_node(self) -> FRETNode:
+        return find_object(self.fret_nodes_with_bursts, id=self.fret_id.value)
+
+    @property
+    def burst_node(self) -> BurstNode:
+        return find_object(self.fret_node.bursts.items, id=self.burst_id.value)
+
+    @property
+    def selected_files_values(self) -> list[dict]:
+        return [{"text": node.name, "value": node.id.hex} for node in self.burst_node.photon_nodes]
+
+    @property
+    def selected_files(self) -> list[str]:
+        assert self.fret_id.value is not None
+        assert self.burst_id.value is not None
+        stored = self.selection_store.value.get((self.fret_id.value, self.burst_id.value), [])
+
+        if stored:
+            return stored
+
+        return [item["value"] for item in self.selected_files_values]
+
+    def set_fret_id(self, value: str):
+        self.fret_id.set(uuid.UUID(value))
+
+        # set the first burst node as the default value
+        burst_node = self.fret_node.bursts[0]
+        self.burst_id.set(burst_node.id)
+
+    def set_burst_id(self, value: str):
+        self.burst_id.set(uuid.UUID(value))
+
+    def set_selected_files(self, values: list[str]):
+        new_value = self.selection_store.value.copy()
+        assert self.fret_id.value is not None
+        assert self.burst_id.value is not None
+        new_value[(self.fret_id.value, self.burst_id.value)] = values
+        self.selection_store.value = new_value
+
+
+# = VIEW
+@solara.component
+def BurstFigure(
+    selection: BurstFigureSelection,
+    global_filters: solara.Reactive[list[BurstFilterItem]],
+):
     figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
-    edit_filter, set_edit_filter = solara.use_state(False)
+    # edit_filter, set_edit_filter = solara.use_state(False)
     edit_settings, set_edit_settings = solara.use_state(False)
-    plot_settings = solara.use_reactive(BurstPlotSettings())
+    plot_settings = solara.use_reactive(
+        BurstPlotSettings()
+    )  # -> these reset to default, combine with burstfigureselection?
 
     dark_effective = solara.lab.use_dark_effective()
 
-    node_ref = Ref(fret_nodes.fields[node_idx.value])
-    burst_ref = Ref(fret_nodes.fields[node_idx.value].bursts[burst_idx.value])
-
-    has_bursts = (node for node in fret_nodes.value if node.bursts)
-    node_values = [{"text": node.name, "value": i} for i, node in enumerate(has_bursts)]
-
-    burst_item_values = [
-        {"text": burst_item.name, "value": i} for i, burst_item in enumerate(node_ref.value.bursts)
-    ]
-
-    file_filter = pl.col("filename").is_in(burst_ref.value.selected_files)
-    f_expr = chain_filters(global_filters.value) & file_filter
-
     # this is triggered twice ? -> known plotly bug
     def redraw():
-        filtered_df = burst_ref.value.df.filter(f_expr)
+        # get the names of the files
+        selected_file_names = [
+            node.name
+            for node in selection.burst_node.photon_nodes
+            if node.id.hex in selection.selected_files
+        ]
+        file_filter = pl.col("filename").is_in(selected_file_names)
+        f_expr = chain_filters(global_filters.value) & file_filter
+        filtered_df = selection.burst_node.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
         figure = generate_figure(
             filtered_df, plot_settings.value, binned_image=img, dark=dark_effective
         )
         set_figure(figure)
 
-    # does hashability matter in speed?
+    # todo upgrade to use_task
     fig_result = solara.use_thread(
         redraw,
         dependencies=[
-            node_idx.value,
-            burst_idx.value,
+            selection.burst_id.value,
+            selection.selected_files,
             plot_settings.value,
             global_filters.value,
-            burst_ref.value.selected_files,
             dark_effective,
         ],
         intrusive_cancel=False,  # is much faster
     )
 
-    def on_fret_node(value: int):
-        node_idx.set(value)
-        burst_idx.set(0)
-
     with solara.Card():
         with solara.Row():
             solara.Select(
                 label="Measurement",
-                value=node_idx.value,
-                on_value=on_fret_node,  # type: ignore
-                values=node_values,  # type: ignore
+                value=selection.fret_id.value.hex,
+                on_value=selection.set_fret_id,  # type: ignore
+                values=selection.fret_values,  # type: ignore
             )
 
             solara.Select(
                 label="Burst item",
-                value=burst_idx.value,
-                on_value=burst_idx.set,
-                values=burst_item_values,  # type: ignore
+                value=selection.burst_id.value.hex,
+                on_value=selection.set_burst_id,
+                values=selection.burst_values,  # type: ignore
             )
-
-            solara.IconButton(icon_name="mdi-file-star", on_click=lambda: set_edit_filter(True))
+            SelectCount(
+                label="Files",
+                value=selection.selected_files,
+                on_value=selection.set_selected_files,
+                items=selection.selected_files_values,  # type: ignore
+                item_name="file",
+            )
+            # solara.IconButton(icon_name="mdi-file-star", on_click=lambda: set_edit_filter(True))
             solara.IconButton(icon_name="mdi-settings", on_click=lambda: set_edit_settings(True))
 
         solara.ProgressLinear(fig_result.state == solara.ResultState.RUNNING)
@@ -635,28 +743,30 @@ def BurstFigureDepr(
             with rv.Dialog(v_model=edit_settings, max_width=750, on_v_model=set_edit_settings):
                 PlotSettingsEditDialog(
                     plot_settings,
-                    burst_ref.value.df.filter(f_expr),  # = filtered dataframe by global filter
+                    selection.burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
                     on_close=lambda: set_edit_settings(False),
-                    duration=burst_ref.value.duration,
+                    duration=selection.burst_node.duration,
                 )
 
-        if edit_filter:
-            with rv.Dialog(v_model=edit_filter, max_width=750, on_v_model=set_edit_filter):
-                FileFilterDialog(
-                    burst_item=burst_ref,
-                    on_close=lambda: set_edit_filter(False),
-                )
+        # if edit_filter:
+        #     pass
+        # with rv.Dialog(v_model=edit_filter, max_width=750, on_v_model=set_edit_filter):
+        #     FileFilterDialog(
+        #         burst_item=burst_ref,
+        #         on_close=lambda: set_edit_filter(False),
+        #     )
 
 
-# burst item model could have plotsettings instance as child to keep the state
+# = VIEW
 @solara.component
-def BurstFigure(
+def BurstFigureDepr(
     fret_nodes: list[FRETNode],  # can be only the value since it doesnt edit the nodes
     global_filters: solara.Reactive[list[BurstFilterItem]],
     node_idx: Optional[solara.Reactive[int]] = None,
     burst_idx: Optional[solara.Reactive[int]] = None,
 ):
     # we are only interested in nodes with bursts
+    # TODO move to controller object
     has_nodes = [node for node in fret_nodes if node.bursts.items]
     node_idx = solara.use_reactive(node_idx if node_idx is not None else 0)
     burst_idx = solara.use_reactive(burst_idx if burst_idx is not None else 0)
@@ -677,11 +787,13 @@ def BurstFigure(
 
     dark_effective = solara.lab.use_dark_effective()
 
-    # file_filter = pl.col("filename").is_in(burst_ref.value.selected_files)
+    #
     f_expr = chain_filters(global_filters.value)  # & file_filter
 
     # this is triggered twice ? -> known plotly bug
     def redraw():
+        # file_filter = pl.col("filename").is_in(burst_ref.value.selected_files)
+
         filtered_df = burst_node.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
         figure = generate_figure(
@@ -689,7 +801,7 @@ def BurstFigure(
         )
         set_figure(figure)
 
-    # does hashability matter in speed?
+    # -> use_task
     fig_result = solara.use_thread(
         redraw,
         dependencies=[
