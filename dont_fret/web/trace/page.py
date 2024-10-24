@@ -178,7 +178,62 @@ def TracePage():
     solara.Text(str(choice.items))
 
     photon_node = get_photons(state.fret_nodes.items, choice.items)
+    TraceFigure(photon_node, TRACE_SETTINGS.value)
     TCSPCFigure(photon_node)
+
+
+@solara.component
+def TraceFigure(photon_node: PhotonNode, settings: TraceSettings):
+    dark_effective = solara.lab.use_dark_effective()
+
+    async def redraw():
+        photons = await state.data_manager.get_photons(photon_node)
+
+        # also probably it would be nice to make the getting photons etc more functional?
+        # we might want to move binning to data manager as well such that is is async
+        t_bin = settings.t_bin * 1e-3
+        bounds = (settings.t_min, settings.t_max)
+
+        traces = {}
+        for stream in TRACE_COLORS:
+            stream_data = PhotonData(
+                photons.data.filter(pl.col("stream") == stream),
+                metadata=photons.metadata,
+                cfg=photons.cfg,
+            )
+
+            traces[stream] = BinnedPhotonData(stream_data, binning_time=t_bin, bounds=bounds)
+
+        fig = go.Figure()
+        for tr in TRACE_COLORS:
+            line = dict(color=TRACE_COLORS[tr])
+            fig.add_trace(
+                go.Scatter(
+                    x=traces[tr].time,
+                    y=TRACE_SIGNS[tr] * traces[tr].photons,
+                    mode="lines",
+                    line=line,
+                    name=tr,
+                )
+            )
+
+            fig.update_layout(
+                # title="Time trace",
+                xaxis_title="Time (s)",
+                yaxis_title="Photons per bin",
+                template="plotly_dark" if dark_effective else "plotly_white",
+            )
+
+        return fig
+
+    figure_task = solara.lab.use_task(redraw, dependencies=[photon_node, settings, dark_effective])
+
+    solara.ProgressLinear(figure_task.pending)
+    if figure_task.finished:
+        solara.FigurePlotly(figure_task.result.value)
+
+    else:
+        solara.Text("loading...")
 
 
 @solara.component
@@ -216,9 +271,11 @@ def TCSPCFigure(photon_node: PhotonNode):
 
     figure_task = solara.lab.use_task(redraw, dependencies=[photon_node, settings, dark_effective])
 
+    # TODO opacity when rerendering new figure
+    # style="opacity: 0.3" if fig_result.state == solara.ResultState.RUNNING else None
+    solara.ProgressLinear(figure_task.pending)
     if figure_task.finished:
         solara.FigurePlotly(figure_task.result.value)
-
     else:
         solara.Text("loading...")
 
