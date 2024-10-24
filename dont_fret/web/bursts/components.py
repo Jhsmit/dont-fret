@@ -21,7 +21,7 @@ from dont_fret.web.methods import chain_filters
 from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
 from dont_fret.web.new_models import FRETNode, FRETStore
 from dont_fret.web.reactive import ReactiveFRETNodes
-from dont_fret.web.utils import not_none
+from dont_fret.web.utils import find_object, not_none
 
 N_STEP = 1000  # number slider steps
 CMAP = px.colors.sequential.Viridis
@@ -557,19 +557,14 @@ def SelectCount(label, value, on_value, items, item_name="item"):
 T = TypeVar("T")
 
 
-# move to utils
-def find_object(items: list[T], **kwargs) -> T:
-    for item in items:
-        if all(getattr(item, key) == value for key, value in kwargs.items()):
-            return item
-    raise ValueError("Object not found")
-
-
 @dataclass
 class BurstFigureSelection:
     fret_store: FRETStore
 
-    # TODO make sure it can not be None
+    # TODO make sure it can not be None -> always some uuid
+    # maybe we should make a class which solves the interdependent select for n states
+    # and it should also be able to deal with deletions in the tree
+    # and it takes the full tree as input
     fret_id: solara.Reactive[uuid.UUID | None] = field(
         default_factory=lambda: solara.reactive(None)
     )
@@ -664,6 +659,13 @@ class BurstFigureSelection:
 
 
 # = VIEW
+# REFACTOR
+# def BurstFigure(
+# seletion: is not a simple dataclass with reactives only
+# node_tree = fret_store derived value which is updated when the node tree is updated (and thus reredner)
+# )
+
+
 @solara.component
 def BurstFigure(
     selection: BurstFigureSelection,

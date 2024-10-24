@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union
 
 import polars as pl
 
-import dont_fret.web.state as state
 from dont_fret import BinnedPhotonData
 from dont_fret.config.config import BurstColor
 from dont_fret.formatting import TRACE_COLORS

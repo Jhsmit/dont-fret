@@ -25,6 +25,16 @@ if TYPE_CHECKING:
     from dont_fret.web.reactive import BurstSettingsReactive, ReactiveFRETNodes, SnackbarReactive
 
 T = TypeVar("T")
+R = TypeVar("R")
+
+
+class _NoDefault:
+    """Sentinel class to distinguish between no default and None as default"""
+
+    pass
+
+
+NO_DEFAULT = _NoDefault()
 
 
 class ListStore(Generic[T]):
@@ -43,8 +53,26 @@ class ListStore(Generic[T]):
     def items(self):
         return self._items.value
 
+    def get_item(self, idx: int, default: R = NO_DEFAULT) -> T | R:
+        try:
+            return self._items.value[idx]
+        except IndexError:
+            if default is NO_DEFAULT:
+                raise IndexError(f"Index {idx} is out of range")
+            return default
+
     def set(self, items: list[T]) -> None:
         self._items.value = items
+
+    def set_item(self, idx: int, item: T) -> None:
+        new_items = self._items.value.copy()
+        if idx == len(new_items):
+            new_items.append(item)
+        elif idx < len(new_items):
+            new_items[idx] = item
+        else:
+            raise IndexError(f"Index {idx} is out of range")
+        self._items.value = new_items
 
     def append(self, item: T) -> None:
         self._items.value = [*self._items.value, item]
@@ -149,6 +177,83 @@ class Cache(Generic[K, V]):
             self._cache.clear()
 
 
+# altnernative for threadpool
+# however, we do need control over the number of workers
+
+# Current implementation with ThreadPoolExecutor
+# import asyncio
+# from concurrent.futures import ThreadPoolExecutor
+
+# class ThreadedDataManager:
+#     def __init__(self, max_workers: int = 4) -> None:
+#         self.executor = ThreadPoolExecutor(max_workers=max_workers)
+#         # ... other initializations ...
+
+#     def run(self, func, *args):
+#         return self.loop.run_in_executor(self.executor, func, *args)
+
+#     async def get_photons(self, node: PhotonNode) -> PhotonData:
+#         # ... (lock handling code) ...
+#         photons = await self.run(PhotonData.from_file, PhotonFile(node.file_path))
+#         # ... (cache update code) ...
+#         return photons
+
+# # Equivalent implementation using threading.Thread
+# import threading
+
+# class ThreadBasedDataManager:
+#     def __init__(self) -> None:
+#         self.active_threads = set()
+#         # ... other initializations ...
+
+#     def run(self, func, *args):
+#         future = asyncio.Future()
+
+#         def thread_func():
+#             try:
+#                 result = func(*args)
+#                 self.loop.call_soon_threadsafe(future.set_result, result)
+#             except Exception as e:
+#                 self.loop.call_soon_threadsafe(future.set_exception, e)
+#             finally:
+#                 self.active_threads.remove(thread)
+
+#         thread = threading.Thread(target=thread_func)
+#         self.active_threads.add(thread)
+#         thread.start()
+#         return future
+
+#     async def get_photons(self, node: PhotonNode) -> PhotonData:
+#         # ... (lock handling code) ...
+#         photons = await self.run(PhotonData.from_file, PhotonFile(node.file_path))
+#         # ... (cache update code) ...
+#         return photons
+
+#     def __del__(self):
+#         for thread in self.active_threads:
+#             thread.join()
+
+# per-key lock will also solve the problem of two threads asking for the same photon item object
+# claude suggestion for cache:
+# class AsyncCache(Generic[K, V]):
+#     def __init__(self):
+#         self._data: Dict[K, V] = {}
+#         self._locks: Dict[K, asyncio.Lock] = {}
+
+#     async def get(self, key: K) -> V | None:
+#         if key not in self._locks:
+#             self._locks[key] = asyncio.Lock()
+
+#         async with self._locks[key]:
+#             return self._data.get(key)
+
+#     async def set(self, key: K, value: V) -> None:
+#         if key not in self._locks:
+#             self._locks[key] = asyncio.Lock()
+
+#         async with self._locks[key]:
+#             self._data[key] = value
+
 # claude suggestiosn for locks on photon items:
 # import asyncio
 # import uuid
@@ -187,6 +292,49 @@ class Cache(Generic[K, V]):
 #         return photons
 
 # ... (rest of the class remains the same)
+
+# testing:
+# import asyncio
+
+# class SyncDataManager:
+#     def __init__(self):
+#         self.async_manager = AsyncDataManager()
+#         self.loop = asyncio.new_event_loop()
+#         asyncio.set_event_loop(self.loop)
+
+#     def __getattr__(self, name):
+#         async_attr = getattr(self.async_manager, name)
+#         if callable(async_attr):
+#             def sync_wrapper(*args, **kwargs):
+#                 return self.loop.run_until_complete(async_attr(*args, **kwargs))
+#             return sync_wrapper
+#         return async_attr
+
+#     def __del__(self):
+#         self.loop.close()
+
+# # Usage in tests:
+# def test_get_photons():
+#     manager = SyncDataManager()
+#     node = PhotonNode(id=uuid.uuid4(), file_path="test_file.photon")
+#     photons = manager.get_photons(node)
+#     assert isinstance(photons, PhotonData)
+#     # ... more assertions
+
+# move functional approach:
+# import asyncio
+# import uuid
+# from typing import Dict, Callable, Any
+
+# # Type aliases for clarity
+# PhotonCache = Dict[uuid.UUID, PhotonData]
+# BurstCache = Dict[tuple[uuid.UUID, str], Bursts]
+
+# async def get_photons(photon_cache: PhotonCache, node: PhotonNode) -> PhotonData:
+#     if node.id not in photon_cache:
+#         photons = await PhotonData.from_file_async(PhotonFile(node.file_path))
+#         photon_cache[node.id] = photons
+#     return photon_cache[node.id]
 
 T = TypeVar("T")
 P = ParamSpec("P")

@@ -13,11 +13,11 @@ from solara.alias import rv
 import dont_fret.web.state as state
 from dont_fret import BinnedPhotonData, PhotonData
 from dont_fret.formatting import TRACE_COLORS, TRACE_SIGNS
-from dont_fret.web.bursts.components import find_object
 from dont_fret.web.methods import generate_traces
 from dont_fret.web.models import BurstNode, PhotonNode, TCSPCSettings, TraceSettings
 from dont_fret.web.new_models import FRETNode, FRETStore
 from dont_fret.web.trace.methods import create_tcspc_histogram
+from dont_fret.web.utils import find_object
 
 # TODO move fret node / photon file reactives to module level
 TCSPC_SETTINGS = solara.Reactive(TCSPCSettings())
@@ -60,7 +60,6 @@ def to_csv(traces: dict[str, BinnedPhotonData], name: str) -> BytesIO:
     return bio
 
 
-# TODO looks a lot like burst selection
 @dataclass
 class PhotonNodeSelection:
     fret_store: FRETStore
@@ -74,6 +73,7 @@ class PhotonNodeSelection:
     )
 
     def __post_init__(self):
+        # i want to remove this, we can check if the current id is in selection when accessing the property
         self.fret_store._items.subscribe(self.on_fret_store)
         self.reset()
 
@@ -140,26 +140,20 @@ def TracePage():
 
     solara.Text("Number of nodes: {}".format(len(state.fret_nodes.items)))
 
-    async def load_info():
-        photons = await state.data_manager.get_photons(state.trace_selection.photon_node)
-        return photons
+    with solara.Sidebar():
+        solara.Select(
+            label="Measurement",
+            value=state.trace_selection.fret_id.value.hex,
+            on_value=state.trace_selection.set_fret_id,  # type: ignore
+            values=state.trace_selection.fret_values,  # type: ignore
+        )
 
-    # result = solara.lab.use_task(load_info, dependencies=[photon_node], prefer_threaded=False)
-    # load_photons = solara.use_task()
-
-    solara.Select(
-        label="Measurement",
-        value=state.trace_selection.fret_id.value.hex,
-        on_value=state.trace_selection.set_fret_id,  # type: ignore
-        values=state.trace_selection.fret_values,  # type: ignore
-    )
-
-    solara.Select(
-        label="Photons",
-        value=state.trace_selection.photon_id.value.hex,
-        on_value=state.trace_selection.set_photon_id,  # type: ignore
-        values=state.trace_selection.photon_values,  # type: ignore
-    )
+        solara.Select(
+            label="Photons",
+            value=state.trace_selection.photon_id.value.hex,
+            on_value=state.trace_selection.set_photon_id,  # type: ignore
+            values=state.trace_selection.photon_values,  # type: ignore
+        )
 
     TCSPCFigure(state.trace_selection.photon_node)
 
