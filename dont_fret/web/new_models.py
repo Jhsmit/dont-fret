@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import copy
 import dataclasses
@@ -6,13 +8,13 @@ import threading
 import uuid
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Generic, Optional, ParamSpec, Type, TypeVar
 
 import numpy as np
 import polars as pl
 import solara
-from attrs import define, field
 
 from dont_fret.config import cfg
 from dont_fret.config.config import BurstColor
@@ -137,6 +139,21 @@ class FRETStore(ListStore[FRETNode]):
             return f"FRET {num_dic.get(len(self), len(self) + 1)}"
 
 
+@dataclass
+class SelectorNode:
+    value: str
+    text: Optional[str] = None
+    children: list[SelectorNode] = field(default_factory=list)
+
+    def __post_init__(self):
+        if self.text is None:
+            self.text = self.value
+
+    @property
+    def record(self) -> dict:
+        return {"text": self.text, "value": self.value}
+
+
 class DaskDataManager:
     pass
 
@@ -145,6 +162,7 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
+# TODO make async, lock per key
 class Cache(Generic[K, V]):
     """superclass for caches"""
 

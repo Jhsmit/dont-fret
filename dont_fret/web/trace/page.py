@@ -15,9 +15,9 @@ from dont_fret import BinnedPhotonData, PhotonData
 from dont_fret.formatting import TRACE_COLORS, TRACE_SIGNS
 from dont_fret.web.methods import generate_traces
 from dont_fret.web.models import BurstNode, PhotonNode, TCSPCSettings, TraceSettings
-from dont_fret.web.new_models import FRETNode, FRETStore
+from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
 from dont_fret.web.trace.methods import create_tcspc_histogram
-from dont_fret.web.utils import find_object
+from dont_fret.web.utils import find_object, get_photons, make_selector_nodes
 
 # TODO move fret node / photon file reactives to module level
 TCSPC_SETTINGS = solara.Reactive(TCSPCSettings())
@@ -131,31 +131,54 @@ class PhotonNodeSelection:
         return [{"text": node.name, "value": node.id.hex} for node in self.fret_node.photons]
 
 
+# move to global state
+choice = ListStore[str]([])
+
+
 @solara.component
 def TracePage():
     solara.Title(f"{state.APP_TITLE} / Trace")
 
+    selector_nodes = make_selector_nodes(state.fret_nodes.items)
+    labels = ["Measurement", "Photons"]  # TODO move elsewhere
     # photons, set_photons = solara.use_state(cast(Optional[ChannelPhotonData], None))
     TRACE_SETTINGS: solara.Reactive[TraceSettings] = solara.use_reactive(TraceSettings())
 
     solara.Text("Number of nodes: {}".format(len(state.fret_nodes.items)))
 
+    stack = selector_nodes
     with solara.Sidebar():
-        solara.Select(
-            label="Measurement",
-            value=state.trace_selection.fret_id.value.hex,
-            on_value=state.trace_selection.set_fret_id,  # type: ignore
-            values=state.trace_selection.fret_values,  # type: ignore
-        )
+        i = 0
+        while stack:
+            records = [node.record for node in stack]
+            if not records:
+                break
 
-        solara.Select(
-            label="Photons",
-            value=state.trace_selection.photon_id.value.hex,
-            on_value=state.trace_selection.set_photon_id,  # type: ignore
-            values=state.trace_selection.photon_values,  # type: ignore
-        )
+            def on_value(value, idx=i):
+                choice.set_item(idx, value)
 
-    TCSPCFigure(state.trace_selection.photon_node)
+            val_stored = choice.get_item(i, None)
+            if val_stored in {v["value"] for v in records}:
+                value = val_stored
+            else:
+                value = records[0]["value"]
+                on_value(value, i)
+
+            solara.Select(
+                label=labels[i],
+                value=value,
+                on_value=on_value,
+                values=records,
+            )
+
+            selected_node = find_object(stack, value=value)
+            stack = selected_node.children
+            i += 1
+
+    solara.Text(str(choice.items))
+
+    photon_node = get_photons(state.fret_nodes.items, choice.items)
+    TCSPCFigure(photon_node)
 
 
 @solara.component
