@@ -10,7 +10,7 @@ from attrs import define, field
 from dont_fret.config import cfg
 from dont_fret.web.bursts.components import BurstFigureSelection
 from dont_fret.web.models import BurstColorList, BurstNode, PhotonNode
-from dont_fret.web.new_models import FRETStore, ThreadedDataManager
+from dont_fret.web.new_models import FRETStore, ListStore, ThreadedDataManager
 from dont_fret.web.reactive import BurstSettingsReactive, ReactiveFRETNodes, SnackbarReactive
 from dont_fret.web.trace.page import PhotonNodeSelection
 
@@ -20,7 +20,7 @@ APP_TITLE = "Don't FRET!"
 filebrowser_folder = solara.Reactive[Path](cfg.web.default_dir)
 burst_settings = BurstSettingsReactive({k: BurstColorList(v) for k, v in cfg.burst_search.items()})
 
-filters = solara.Reactive(copy.deepcopy(cfg.web.burst_filters))
+filters = ListStore(copy.deepcopy(cfg.web.burst_filters))
 snackbar = SnackbarReactive()
 
 # selections for burst figures (node, burst)
