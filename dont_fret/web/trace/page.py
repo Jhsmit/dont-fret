@@ -17,7 +17,7 @@ from dont_fret.web.methods import generate_traces
 from dont_fret.web.models import BurstNode, PhotonNode, TCSPCSettings, TraceSettings
 from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
 from dont_fret.web.trace.methods import create_tcspc_histogram
-from dont_fret.web.utils import find_object, get_photons, make_selector_nodes
+from dont_fret.web.utils import find_object, get_photons, make_selector_nodes, wrap_callback
 
 # TODO move fret node / photon file reactives to module level
 TCSPC_SETTINGS = solara.Reactive(TCSPCSettings())
@@ -60,6 +60,7 @@ def to_csv(traces: dict[str, BinnedPhotonData], name: str) -> BytesIO:
     return bio
 
 
+# TODO remove
 @dataclass
 class PhotonNodeSelection:
     fret_store: FRETStore
@@ -154,8 +155,7 @@ def TracePage():
             if not records:
                 break
 
-            def on_value(value, idx=i):
-                choice.set_item(idx, value)
+            on_value = wrap_callback(choice.set_item, "item", idx=i)
 
             val_stored = choice.get_item(i, None)
             if val_stored in {v["value"] for v in records}:
@@ -180,6 +180,17 @@ def TracePage():
     photon_node = get_photons(state.fret_nodes.items, choice.items)
     TraceFigure(photon_node, TRACE_SETTINGS.value)
     TCSPCFigure(photon_node)
+
+
+@solara.component
+def FigureFromTask(task: solara.lab.Task):
+    solara.ProgressLinear(task.pending)
+    if task.latest is None:
+        solara.Text("loading...")
+    else:
+        figure = task.value if task.finished else task.latest
+        with solara.Div(style="opacity: 0.3" if task.pending else None):
+            solara.FigurePlotly(figure)
 
 
 @solara.component
@@ -227,13 +238,7 @@ def TraceFigure(photon_node: PhotonNode, settings: TraceSettings):
         return fig
 
     figure_task = solara.lab.use_task(redraw, dependencies=[photon_node, settings, dark_effective])
-
-    solara.ProgressLinear(figure_task.pending)
-    if figure_task.finished:
-        solara.FigurePlotly(figure_task.result.value)
-
-    else:
-        solara.Text("loading...")
+    FigureFromTask(figure_task)
 
 
 @solara.component
@@ -270,14 +275,7 @@ def TCSPCFigure(photon_node: PhotonNode):
         return fig
 
     figure_task = solara.lab.use_task(redraw, dependencies=[photon_node, settings, dark_effective])
-
-    # TODO opacity when rerendering new figure
-    # style="opacity: 0.3" if fig_result.state == solara.ResultState.RUNNING else None
-    solara.ProgressLinear(figure_task.pending)
-    if figure_task.finished:
-        solara.FigurePlotly(figure_task.result.value)
-    else:
-        solara.Text("loading...")
+    FigureFromTask(figure_task)
 
 
 @solara.component
