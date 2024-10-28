@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Callable, Generic, Optional, ParamSpec, Type, 
 import numpy as np
 import polars as pl
 import solara
+from solara.toestand import merge_state
 
 from dont_fret.config import cfg
 from dont_fret.config.config import BurstColor
@@ -50,6 +51,9 @@ class ListStore(Generic[T]):
 
     def __getitem__(self, idx: int) -> T:
         return self.items[idx]
+
+    def __iter__(self):
+        return iter(self.items)
 
     @property
     def items(self):
@@ -90,7 +94,13 @@ class ListStore(Generic[T]):
         return item
 
     def remove(self, item: T) -> None:
-        self._items.value = [node for node in self.items if item != item]
+        self._items.value = [it for it in self.items if it != item]
+
+    def update(self, idx: int, **kwargs):
+        new_value = self.items.copy()
+        updated_item = merge_state(new_value[idx], **kwargs)
+        new_value[idx] = updated_item
+        self._items.value = new_value
 
 
 @dataclasses.dataclass
