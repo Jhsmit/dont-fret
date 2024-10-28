@@ -1,11 +1,40 @@
 import time
 import uuid
-from typing import Literal, Optional, TypeVar
+from functools import partial
+from typing import Any, Callable, Literal, Optional, TypeVar
 
 from dont_fret.web.models import BurstNode, PhotonNode
 from dont_fret.web.new_models import FRETNode, SelectorNode
 
 T = TypeVar("T")
+V = TypeVar("V")
+
+
+# TODO 1) it should be able not to take any args at all
+# and just bind args and return a callable taking no arg
+# and 2) you should be able to not give any value for value_arg
+# and then the returned wrapper takes a single argument which is passed to the function
+# as its only remaining non-wrapped argument
+def wrap_callback(fn: Callable[..., Any], value_arg: str, **bound_args: Any) -> Callable[[V], None]:
+    """
+    Wraps a function to create a callback suitable for Solara component props.
+
+    Args:
+        fn: The base function to wrap (e.g., set_item)
+        value_arg: Name of the argument that will receive the callback's value
+        **bound_args: Fixed arguments to bind to the function
+
+    Example:
+        >>> store = ListStore()
+        >>> on_value = wrap_callback(store.set_item, 'item', idx=0)
+        >>> solara.Select(value='current', on_value=on_value, values=['a', 'b'])
+    """
+    pfunc = partial(fn, **bound_args)
+
+    def wrapper(value: V) -> None:
+        pfunc(**{value_arg: value})
+
+    return wrapper
 
 
 def not_none(*args: Optional[T]) -> T:
