@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import polars as pl
 import solara
-from solara.alias import rv
 
 import dont_fret.web.state as state
 from dont_fret.web.bursts.components import BurstFigure, FilterEditDialog, FilterListItem
-from dont_fret.web.methods import chain_filters
 
 
 @solara.component
