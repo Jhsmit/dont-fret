@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from functools import reduce
+from itertools import chain
+from operator import and_
 from typing import Callable, Literal, Optional, TypeVar, cast
 
+import altair as alt
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
@@ -15,318 +19,280 @@ from plotly.subplots import make_subplots
 from solara.alias import rv
 from solara.toestand import Ref
 
+import dont_fret.web.state as state
 from dont_fret.web.bursts.methods import create_histogram
 from dont_fret.web.components import RangeInputField
 from dont_fret.web.methods import chain_filters
 from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
-from dont_fret.web.new_models import FRETNode, FRETStore
+from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
 from dont_fret.web.reactive import ReactiveFRETNodes
-from dont_fret.web.utils import find_object, not_none
+from dont_fret.web.utils import (
+    find_index,
+    find_object,
+    get_bursts,
+    make_selector_nodes,
+    not_none,
+    wrap_callback,
+)
 
 N_STEP = 1000  # number slider steps
 CMAP = px.colors.sequential.Viridis
 WRATIO = 3.5
 
-
-@solara.component
-def FigurePlotlyShapes(
-    fig: go.Figure,
-    shapes: dict,
-    dependencies=None,
-):
-    from plotly.graph_objs._figurewidget import FigureWidget
-
-    fig_element = FigureWidget.element()  # type: ignore
-
-    def update_data():
-        fig_widget: FigureWidget = solara.get_widget(fig_element)  # type: ignore
-        fig_widget.layout = fig.layout
-
-        length = len(fig_widget.data)  # type: ignore
-        fig_widget.add_traces(fig.data)
-        data = list(fig_widget.data)
-        fig_widget.data = data[length:]
-
-    def update_shapes():
-        if shapes:
-            fig_widget: FigureWidget = solara.get_widget(fig_element)  # type: ignore
-            fig_widget.update_shapes(**shapes)
-
-    solara.use_effect(update_data, dependencies or fig)
-    solara.use_effect(update_shapes, shapes)
-
-    return fig_element
+DEFAULT_FIELD = "n_photons"
+# TODO this is hardcoded but it depends on cfg settings what fields burst item dataframes have
+# -> deduce from selection
+FIELD_OPTIONS = [
+    "burst_index",
+    "n_DD",
+    "n_DA",
+    "n_AA",
+    "n_AD",
+    "nanotimes_DD",
+    "nanotimes_DA",
+    "nanotimes_AA",
+    "nanotimes_AD",
+    "timestamps_mean",
+    "timestamps_min",
+    "timestamps_max",
+    "E_app",
+    "S_app",
+    "n_photons",
+    "time_mean",
+    "time_length",
+    "tau_DD",
+    "tau_DA",
+    "tau_AA",
+    "tau_AD",
+]
 
 
-@solara.component
-def EditFilterDialog(
-    filter_item: solara.Reactive[BurstFilterItem],  # should be a reactive
-    data: np.ndarray,
-    on_close: Callable[[], None],
-):
-    def bin_data():
-        data_f = data[~np.isnan(data)]
-        counts, binspace = np.histogram(data_f, bins="fd")
-        xbins = {"start": binspace[0], "end": binspace[-1], "size": binspace[1] - binspace[0]}
-        arange = 2 * binspace[0] - 0.05 * binspace[-1], 1.05 * binspace[-1] - binspace[0]
+def fd_bin_width(data: pl.Series) -> float:
+    """
+    Calculate bin width using the Freedman-Diaconis rule:
+    bin width = 2 * IQR * n^(-1/3)
+    where IQR is the interquartile range and n is the number of observations
+    """
+    q75, q25 = data.quantile(0.75), data.quantile(0.25)
+    assert q75 is not None
+    assert q25 is not None
+    iqr = q75 - q25
+    n = len(data)
+    return 2 * iqr * (n ** (-1 / 3))
 
-        return data_f, xbins, arange
 
-    data_f, xbins, arange = solara.use_memo(bin_data, [])
-
-    xr_default = (
-        not_none(filter_item.value.min, arange[0]),
-        not_none(filter_item.value.max, arange[1]),
+def make_chart(df: pl.DataFrame, field: str, opacity: float = 1.0):
+    chart = (
+        alt.Chart(df.select(pl.col(field)))
+        .mark_rect(opacity=opacity)
+        .transform_bin(
+            as_=["x", "x2"],
+            field=field,
+            bin=alt.Bin(step=fd_bin_width(df[field])),
+        )
+        .encode(
+            x=alt.X("x:Q", scale={"zero": False}, title=field),
+            x2="x2:Q",
+            y=alt.Y("count():Q", title="count"),
+            tooltip=[
+                alt.Tooltip("bin_center:Q", title="Bin center", format=".3g"),
+                alt.Tooltip("count():Q", title="Count", format=","),
+            ],
+        )
+        .transform_calculate(
+            bin_center="(datum.x + datum.x2) / 2"  # Calculate bin center
+        )
+        # .add_params(selection)  # Add the selection to the chart
+        .properties(width="container")
     )
-
-    xrange, set_xrange = solara.use_state(xr_default)
-    shapes, set_shapes = solara.use_state({})
-
-    def make_figure():
-        return create_histogram(data_f, xbins, arange, xrange)
-
-    fig = solara.use_memo(make_figure, [])
-
-    show_slider, set_show_slider = solara.use_state(True)
-
-    def update_xmin(value):
-        set_xrange((value, xrange[1]))
-        d = {"patch": dict(x0=arange[0], x1=value), "selector": 0}
-        set_shapes(d)
-
-    def update_xmax(value):
-        set_xrange((xrange[0], value))
-        d = {"patch": dict(x0=value, x1=arange[1]), "selector": 1}
-        set_shapes(d)
-
-    def on_slider(value: tuple[float, float]):
-        if value[0] != xrange[0]:
-            d = {"patch": dict(x0=arange[0], x1=value[0]), "selector": 0}
-        elif value[1] != xrange[1]:
-            d = {"patch": dict(x0=value[1], x1=arange[1]), "selector": 1}
-        else:
-            return
-        set_shapes(d)
-        set_xrange(value)
-
-    with solara.Card(f"Filter: {filter_item.value.name}"):
-        FigurePlotlyShapes(fig, shapes=shapes)
-        step = (arange[1] - arange[0]) / N_STEP
-        with solara.Row():
-            with solara.Tooltip(
-                "Disable slider to prevent threshold value rounding."  # type: ignore
-            ):
-                rv.Switch(v_model=show_slider, on_v_model=set_show_slider)
-            if show_slider:
-                solara.SliderRangeFloat(
-                    label="",
-                    min=arange[0],
-                    max=arange[1],
-                    value=xrange,
-                    step=step,
-                    on_value=on_slider,
-                )
-        with solara.Row():
-            RangeInputField(
-                label="Min",
-                value=xrange[0],
-                vtype=float,
-                on_value=update_xmin,
-                vmin=arange[0],
-            )
-            RangeInputField(
-                label="Max",
-                value=xrange[1],
-                vtype=float,
-                on_value=update_xmax,
-                vmax=arange[1],
-            )
-
-        def on_save():
-            new_filter = BurstFilterItem(
-                filter_item.value.name,
-                min=xrange[0],
-                max=xrange[1],
-            )
-            filter_item.set(new_filter)
-            on_close()
-
-        with solara.CardActions():
-            rv.Spacer()
-            solara.Button("Save", icon_name="mdi-content-save", on_click=on_save)
-            solara.Button("Cancel", icon_name="mdi-window-close", on_click=on_close)
+    return chart
 
 
-@solara.component
-def FilterListItem(
-    filter_item: solara.Reactive[BurstFilterItem], data: np.ndarray, on_delete: Callable[[], None]
-):
-    edit, set_edit = solara.use_state(False)
-    with rv.ListItem():
-        rv.ListItemAvatar(children=[rv.Icon(children=["mdi-filter"])])
-        rv.ListItemTitle(children=[filter_item.value.name])
+def make_overlay_chart(
+    df: pl.DataFrame, field: str, filters: list[BurstFilterItem]
+) -> alt.LayerChart | alt.Chart:
+    # TODO chain filters (test)
+    # f = chain_filters(filters)
+    # df_f = df.filter(f)
 
-        # TODO multi line
-        def fmt(v):
-            if v is None:
-                return "None"
-            else:
-                return f"{v:.5g}"
-
-        rv.ListItemSubtitle(
-            children=[f"{fmt(filter_item.value.min)} - {fmt(filter_item.value.max)}"]
-        )
-
-        solara.IconButton(
-            color="secondary",
-            small=True,
-            rounded=True,
-            icon_name="mdi-delete",
-            on_click=on_delete,
-        )
-
-        solara.IconButton(
-            color="secondary",
-            small=True,
-            rounded=True,
-            icon_name="mdi-pencil",
-            on_click=lambda: set_edit(True),
-        )
-
-    with rv.Dialog(v_model=edit, max_width=750, on_v_model=set_edit):
-        if edit:
-            EditFilterDialog(
-                filter_item,
-                data,
-                on_close=lambda: set_edit(False),
-            )
-
-
-DTYPES = {
-    "E_app": float,
-    "S_app": float,
-    "n_photons": int,
-    "time_length": float,
-    "time_mean": float,
-    "time_min": float,
-    "time_max": float,
-    "n_DD": int,
-    "n_DA": int,
-    "n_AA": int,
-    "n_AD": int,
-    "tau_DD": float,
-    "tau_DA": float,
-    "tau_AA": float,
-    "tau_AD": float,
-}
-
-
-@solara.component
-def BurstFilters(filters: solara.Reactive[list[BurstFilterItem]], dataframe: pl.DataFrame):
-    f_names = [f.name for f in filters.value]
-    attrs = [k for k in DTYPES if k not in f_names]
-    new_filter_name, set_new_filter_name = solara.use_state(attrs[0])
-
-    with solara.Card(title="Global filters"):
-        with rv.List(dense=False):
-            for idx, flt in enumerate(filters.value):
-
-                def on_delete(idx=idx):
-                    new_filters = filters.value.copy()
-                    del new_filters[idx]
-                    filters.set(new_filters)
-
-                arr = dataframe[flt.name].to_numpy()
-                FilterListItem(Ref(filters.fields[idx]), arr, on_delete)
-
-        def add_filter():
-            item = BurstFilterItem(name=new_filter_name)
-            new_filters = filters.value.copy()
-            new_filters.append(item)
-            filters.set(new_filters)
-
-        solara.Select(
-            label="Filter attribute",
-            value=new_filter_name,
-            values=attrs,
-            on_value=set_new_filter_name,
-        )
-        solara.Button("Add filter", on_click=lambda: add_filter(), block=True)
-
-
-def generate_figure(
-    df: pl.DataFrame,
-    plot_settings: BurstPlotSettings,
-    binned_image: BinnedImage,
-    dark: bool = False,
-) -> go.Figure:
-    fig = make_subplots(
-        rows=2,
-        cols=2,
-        shared_yaxes="rows",  # type: ignore
-        shared_xaxes="columns",  # type: ignore
-        horizontal_spacing=0.02,
-        vertical_spacing=0.02,
-        column_widths=[WRATIO, 1],
-        row_heights=[1, WRATIO],
-    )
-
-    if sum([plot_settings.z_min is None, plot_settings.z_max is None]) == 1:
-        raise ValueError("z_min and z_max must be both None or both not None")
-
-    hist2d = go.Heatmap(
-        x=binned_image.x,
-        y=binned_image.y,
-        z=binned_image.img_data.T,
-        zmin=plot_settings.z_min,
-        zmax=plot_settings.z_max,
-        colorscale=CMAP,
-        colorbar={"title": "Counts"},
-    )
-
-    fig.add_trace(hist2d, row=2, col=1)
-    fig.update_xaxes(row=2, col=1, range=plot_settings.x_range, title=plot_settings.x_name)
-    fig.update_yaxes(row=2, col=1, range=plot_settings.y_range, title=plot_settings.y_name)
-
-    if dark:
-        hist_settings = {
-            "marker_color": "#adadad",
-        }
+    all_exprs = list(chain(*[f.as_expr() for f in filters if f.active]))  # flatten
+    if all_exprs:
+        f_expr = reduce(and_, all_exprs)
+        df_f = df.filter(f_expr)
     else:
-        hist_settings = {
-            "marker_color": "#330C73",
-        }
+        df_f = df
 
-    histx = go.Histogram(
-        x=df[plot_settings.x_name],
-        xbins=plot_settings.xbins,
-        name=plot_settings.x_name,
-        **hist_settings,
-    )
-    fig.add_trace(histx, row=1, col=1)
-    fig.update_yaxes(row=1, col=1, title="counts")
+    base_chart = make_chart(df, field, opacity=0.5)
 
-    histy = go.Histogram(
-        y=df[plot_settings.y_name],
-        ybins=plot_settings.ybins,
-        name=plot_settings.y_name,
-        **hist_settings,
-    )
-    fig.add_trace(
-        histy,
-        row=2,
-        col=2,
-    )
-    fig.update_xaxes(row=2, col=2, title="counts")
-    fig.update_layout(
-        width=700,
-        height=700,
-        showlegend=False,
-        margin=dict(l=20, r=20, t=20, b=20),
-        template="plotly_dark" if dark else "plotly_white",
+    selection = alt.selection_interval(name="range", encodings=["x"])
+
+    if len(df_f) > 0:
+        filtered_chart = make_chart(df_f, field).add_params(selection)
+        chart = base_chart + filtered_chart
+    else:
+        chart = base_chart.add_params(selection)
+
+    return chart
+
+
+@solara.component
+def SelectionChart(chart: alt.Chart | alt.LayerChart, on_selection):
+    jchart = alt.JupyterChart.element(chart=chart, embed_options={"actions": False})
+
+    def bind():
+        widget = solara.get_widget(jchart)
+        widget.selections.observe(on_selection, "range")
+
+    solara.use_effect(bind, [chart])
+
+
+@solara.component
+def FilterItemCard(filter_item: BurstFilterItem):
+    text_style = {
+        "fontWeight": "bold",
+        "fontSize": "16px",
+        "padding": "8px 0",
+    }
+    with solara.Card(title=None):
+        with solara.Row(style={"align-items": "end"}, justify="space-between"):
+            solara.Text(filter_item.name, style=text_style)
+            with solara.Row(style={"align-items": "end"}, gap="1px"):
+
+                def on_checkbox(value: bool, filter_item=filter_item):
+                    idx = state.filters.index(filter_item)
+                    state.filters.update(idx, active=value)
+
+                solara.Checkbox(label="", style="marginBottom: -16px", on_value=on_checkbox)
+
+                def on_delete(filter_item=filter_item):
+                    state.filters.remove(filter_item)
+
+                solara.IconButton(
+                    icon_name="delete",
+                    on_click=on_delete,
+                )
+
+        with solara.Row():
+
+            def on_vmin(value, filter_item=filter_item):
+                idx = state.filters.index(filter_item)
+                state.filters.update(idx, min=value)
+
+            RangeInputField(
+                label="Lower bound",
+                value=filter_item.min,
+                on_value=on_vmin,
+                vmax=filter_item.max,
+                vtype=float,
+            )
+
+            def on_vmax(value, filter_item=filter_item):
+                idx = state.filters.index(filter_item)
+                state.filters.update(idx, max=value)
+
+            RangeInputField(
+                label="Upper bound",
+                value=filter_item.max,
+                on_value=on_vmax,
+                vmin=filter_item.min,
+                vtype=float,
+            )
+
+
+@solara.component
+def FilterEditDialog():
+    field = solara.use_reactive(DEFAULT_FIELD)
+    chart_selection = solara.use_reactive(None)
+    existing_filter_fields = [f.name for f in state.filters]
+    selector_nodes = make_selector_nodes(state.fret_nodes.items, attr="bursts")
+
+    def make_store():
+        return ListStore[str]([selector_nodes[0].value, selector_nodes[0].children[0].value])
+
+    burst_node_choice = solara.use_memo(make_store, [])
+
+    def make_chart():
+        burst_node = get_bursts(state.fret_nodes.items, burst_node_choice.items)
+        new_chart = make_overlay_chart(burst_node.df, field.value, state.filters.items)
+        return new_chart
+
+    # note: cant be 100% sure but you could get some panicking threads when using
+    # vegafusion in a use_task hook with prefer_threaded=True
+    task_chart = solara.lab.use_task(
+        make_chart,
+        dependencies=[field.value, state.filters.items, burst_node_choice.items],
+        prefer_threaded=False,
     )
 
-    return fig
+    def filter_from_selection():
+        """adds or edits a filter based on the current selection in the chart"""
+        try:
+            vmin, vmax = chart_selection.value["new"].value["x"]  # type: ignore
+        except (KeyError, TypeError):
+            vmin, vmax = None, None
+
+        if field.value in existing_filter_fields:
+            current_item_idx = find_index(state.filters.items, name=field.value)
+            current_item = state.filters.items[current_item_idx]
+            new_item = replace(current_item, min=vmin, max=vmax)
+            state.filters.set_item(current_item_idx, new_item)
+        else:
+            filter_item = BurstFilterItem(name=field.value, min=vmin, max=vmax)
+            state.filters.append(filter_item)
+
+    with solara.ColumnsResponsive([8, 4]):
+        with solara.Card("Histogram"):
+            labels = ["Measurement", "Bursts"]  # TODO move elsewhere
+
+            # TODO make a class which yields setters/values for each selector
+            with solara.Row():
+                stack = selector_nodes
+                i = 0
+                while stack:
+                    records = [node.record for node in stack]
+                    if not records:
+                        break
+
+                    on_value = wrap_callback(burst_node_choice.set_item, "item", idx=i)
+
+                    val_stored = burst_node_choice.get_item(i, None)
+                    if val_stored in {v["value"] for v in records}:
+                        value = val_stored
+                    else:
+                        value = records[0]["value"]
+                        on_value(value)
+
+                    solara.Select(
+                        label=labels[i],
+                        value=value,
+                        values=records,
+                        on_value=on_value,
+                    )
+
+                    selected_node = find_object(stack, value=value)
+                    stack = selected_node.children
+                    i += 1
+
+            with solara.Row(style={"align-items": "center"}):
+
+                def on_field(value):
+                    chart_selection.set(None)
+                    field.set(value)
+
+                solara.Select(
+                    label="Field", value=field.value, values=FIELD_OPTIONS, on_value=on_field
+                )
+                solara.IconButton("mdi-filter-plus", on_click=filter_from_selection)
+            if task_chart.latest is None:
+                solara.Text("loading...")
+            else:
+                chart = task_chart.value if task_chart.finished else task_chart.latest
+                assert chart is not None
+                with solara.Div(style="opacity: 0.3" if task_chart.pending else None):
+                    SelectionChart(chart, on_selection=chart_selection.set)
+        with solara.Column():
+            for filter_item in state.filters:
+                FilterItemCard(filter_item)
 
 
 @solara.component
@@ -334,6 +300,7 @@ def FileFilterDialog(
     burst_item: solara.Reactive[BurstNode],
     on_close: Callable[[], None],
 ):
+    """update; selected files is stored elsewhere now"""
     all_files = sorted(burst_item.value.df["filename"].unique())
     local_selected_files = solara.use_reactive(cast(list[str], burst_item.value.selected_files))
     error, set_error = solara.use_state("")
@@ -666,10 +633,85 @@ class BurstFigureSelection:
 # )
 
 
+def generate_figure(
+    df: pl.DataFrame,
+    plot_settings: BurstPlotSettings,
+    binned_image: BinnedImage,
+    dark: bool = False,
+) -> go.Figure:
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        shared_yaxes="rows",  # type: ignore
+        shared_xaxes="columns",  # type: ignore
+        horizontal_spacing=0.02,
+        vertical_spacing=0.02,
+        column_widths=[WRATIO, 1],
+        row_heights=[1, WRATIO],
+    )
+
+    if sum([plot_settings.z_min is None, plot_settings.z_max is None]) == 1:
+        raise ValueError("z_min and z_max must be both None or both not None")
+
+    hist2d = go.Heatmap(
+        x=binned_image.x,
+        y=binned_image.y,
+        z=binned_image.img_data.T,
+        zmin=plot_settings.z_min,
+        zmax=plot_settings.z_max,
+        colorscale=CMAP,
+        colorbar={"title": "Counts"},
+    )
+
+    fig.add_trace(hist2d, row=2, col=1)
+    fig.update_xaxes(row=2, col=1, range=plot_settings.x_range, title=plot_settings.x_name)
+    fig.update_yaxes(row=2, col=1, range=plot_settings.y_range, title=plot_settings.y_name)
+
+    if dark:
+        hist_settings = {
+            "marker_color": "#adadad",
+        }
+    else:
+        hist_settings = {
+            "marker_color": "#330C73",
+        }
+
+    histx = go.Histogram(
+        x=df[plot_settings.x_name],
+        xbins=plot_settings.xbins,
+        name=plot_settings.x_name,
+        **hist_settings,
+    )
+    fig.add_trace(histx, row=1, col=1)
+    fig.update_yaxes(row=1, col=1, title="counts")
+
+    histy = go.Histogram(
+        y=df[plot_settings.y_name],
+        ybins=plot_settings.ybins,
+        name=plot_settings.y_name,
+        **hist_settings,
+    )
+    fig.add_trace(
+        histy,
+        row=2,
+        col=2,
+    )
+    fig.update_xaxes(row=2, col=2, title="counts")
+    fig.update_layout(
+        width=700,
+        height=700,
+        showlegend=False,
+        margin=dict(l=20, r=20, t=20, b=20),
+        template="plotly_dark" if dark else "plotly_white",
+    )
+
+    return fig
+
+
 @solara.component
 def BurstFigure(
     selection: BurstFigureSelection,
-    global_filters: solara.Reactive[list[BurstFilterItem]],
+    global_filters: ListStore[BurstFilterItem],
 ):
     figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
     # edit_filter, set_edit_filter = solara.use_state(False)
@@ -689,7 +731,7 @@ def BurstFigure(
             if node.id.hex in selection.selected_files
         ]
         file_filter = pl.col("filename").is_in(selected_file_names)
-        f_expr = chain_filters(global_filters.value) & file_filter
+        f_expr = chain_filters(global_filters.items) & file_filter
         filtered_df = selection.burst_node.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
         figure = generate_figure(
@@ -704,7 +746,7 @@ def BurstFigure(
             selection.burst_id.value,
             selection.selected_files,
             plot_settings.value,
-            global_filters.value,
+            global_filters.items,
             dark_effective,
         ],
         intrusive_cancel=False,  # is much faster
@@ -759,110 +801,3 @@ def BurstFigure(
         #         burst_item=burst_ref,
         #         on_close=lambda: set_edit_filter(False),
         #     )
-
-
-# = VIEW
-@solara.component
-def BurstFigureDepr(
-    fret_nodes: list[FRETNode],  # can be only the value since it doesnt edit the nodes
-    global_filters: solara.Reactive[list[BurstFilterItem]],
-    node_idx: Optional[solara.Reactive[int]] = None,
-    burst_idx: Optional[solara.Reactive[int]] = None,
-):
-    # we are only interested in nodes with bursts
-    # TODO move to controller object
-    has_nodes = [node for node in fret_nodes if node.bursts.items]
-    node_idx = solara.use_reactive(node_idx if node_idx is not None else 0)
-    burst_idx = solara.use_reactive(burst_idx if burst_idx is not None else 0)
-
-    fret_node = has_nodes[node_idx.value]
-    burst_node = fret_node.bursts[burst_idx.value]
-
-    # selector options
-    fret_node_values = [{"text": node.name.value, "value": i} for i, node in enumerate(has_nodes)]
-    burst_node_values = [
-        {"text": burst_node.name, "value": i} for i, burst_node in enumerate(fret_node.bursts.items)
-    ]
-
-    figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
-    edit_filter, set_edit_filter = solara.use_state(False)
-    edit_settings, set_edit_settings = solara.use_state(False)
-    plot_settings = solara.use_reactive(BurstPlotSettings())
-
-    dark_effective = solara.lab.use_dark_effective()
-
-    #
-    f_expr = chain_filters(global_filters.value)  # & file_filter
-
-    # this is triggered twice ? -> known plotly bug
-    def redraw():
-        # file_filter = pl.col("filename").is_in(burst_ref.value.selected_files)
-
-        filtered_df = burst_node.df.filter(f_expr)
-        img = BinnedImage.from_settings(filtered_df, plot_settings.value)
-        figure = generate_figure(
-            filtered_df, plot_settings.value, binned_image=img, dark=dark_effective
-        )
-        set_figure(figure)
-
-    # -> use_task
-    fig_result = solara.use_thread(
-        redraw,
-        dependencies=[
-            node_idx.value,
-            burst_idx.value,
-            plot_settings.value,
-            global_filters.value,
-            dark_effective,
-        ],
-        intrusive_cancel=False,  # is much faster
-    )
-
-    def on_fret_node(value: int):
-        node_idx.set(value)
-        burst_idx.set(0)
-
-    print(fret_node_values)
-    with solara.Card():
-        with solara.Row():
-            solara.Select(
-                label="Measurement",
-                value=node_idx.value,
-                on_value=on_fret_node,  # type: ignore
-                values=fret_node_values,  # type: ignore
-            )
-
-            solara.Select(
-                label="Burst item",
-                value=burst_idx.value,
-                on_value=burst_idx.set,
-                values=burst_node_values,  # type: ignore
-            )
-
-            solara.IconButton(icon_name="mdi-file-star", on_click=lambda: set_edit_filter(True))
-            solara.IconButton(icon_name="mdi-settings", on_click=lambda: set_edit_settings(True))
-
-        solara.ProgressLinear(fig_result.state == solara.ResultState.RUNNING)
-        if figure is not None:
-            with solara.Div(
-                style="opacity: 0.3" if fig_result.state == solara.ResultState.RUNNING else None
-            ):
-                solara.FigurePlotly(figure)
-
-        # dedent this and figure will flicker/be removed when opening the dialog
-        if edit_settings:
-            with rv.Dialog(v_model=edit_settings, max_width=750, on_v_model=set_edit_settings):
-                PlotSettingsEditDialog(
-                    plot_settings,
-                    burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
-                    on_close=lambda: set_edit_settings(False),
-                    duration=burst_node.duration,
-                )
-
-        if edit_filter:
-            pass
-            # with rv.Dialog(v_model=edit_filter, max_width=750, on_v_model=set_edit_filter):
-            #     FileFilterDialog(
-            #         burst_item=burst_ref,
-            #         on_close=lambda: set_edit_filter(False),
-            #     )
