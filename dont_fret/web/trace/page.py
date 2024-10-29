@@ -142,10 +142,7 @@ def TracePage():
 
     selector_nodes = make_selector_nodes(state.fret_nodes.items)
     labels = ["Measurement", "Photons"]  # TODO move elsewhere
-    # photons, set_photons = solara.use_state(cast(Optional[ChannelPhotonData], None))
     TRACE_SETTINGS: solara.Reactive[TraceSettings] = solara.use_reactive(TraceSettings())
-
-    solara.Text("Number of nodes: {}".format(len(state.fret_nodes.items)))
 
     stack = selector_nodes
     with solara.Sidebar():
@@ -162,7 +159,7 @@ def TracePage():
                 value = val_stored
             else:
                 value = records[0]["value"]
-                on_value(value, i)
+                on_value(value)
 
             solara.Select(
                 label=labels[i],
@@ -174,8 +171,6 @@ def TracePage():
             selected_node = find_object(stack, value=value)
             stack = selected_node.children
             i += 1
-
-    solara.Text(str(choice.items))
 
     photon_node = get_photons(state.fret_nodes.items, choice.items)
     TraceFigure(photon_node, TRACE_SETTINGS.value)
