@@ -700,8 +700,7 @@ def BurstFigure(
     selection: BurstFigureSelection,
 ):
     figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
-    # edit_filter, set_edit_filter = solara.use_state(False)
-    edit_settings, set_edit_settings = solara.use_state(False)
+    edit_settings = solara.use_reactive(False)
     plot_settings = solara.use_reactive(
         BurstPlotSettings()
     )  # -> these reset to default, combine with burstfigureselection?
@@ -716,16 +715,8 @@ def BurstFigure(
     file_filter = pl.col("filename").is_in(selected_file_names)
     f_expr = chain_filters(state.filters.items) & file_filter
 
-    # this is triggered twice ? -> known plotly bug
+    # this is triggered twice ? -> known plotly bug, use .key(...)
     def redraw():
-        # get the names of the files
-        # selected_file_names = [
-        #     node.name
-        #     for node in selection.burst_node.photon_nodes
-        #     if node.id.hex in selection.selected_files
-        # ]
-        # file_filter = pl.col("filename").is_in(selected_file_names)
-        # f_expr = chain_filters(state.filters.items) & file_filter
         filtered_df = selection.burst_node.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
         figure = generate_figure(
@@ -769,7 +760,7 @@ def BurstFigure(
                 item_name="file",
             )
             # solara.IconButton(icon_name="mdi-file-star", on_click=lambda: set_edit_filter(True))
-            solara.IconButton(icon_name="mdi-settings", on_click=lambda: set_edit_settings(True))
+            solara.IconButton(icon_name="mdi-settings", on_click=lambda: edit_settings.set(True))
 
         solara.ProgressLinear(fig_result.state == solara.ResultState.RUNNING)
         if figure is not None:
@@ -779,12 +770,14 @@ def BurstFigure(
                 solara.FigurePlotly(figure)
 
         # dedent this and figure will flicker/be removed when opening the dialog
-        if edit_settings:
-            with rv.Dialog(v_model=edit_settings, max_width=750, on_v_model=set_edit_settings):
+        if edit_settings.value:
+            with rv.Dialog(
+                v_model=edit_settings.value, max_width=750, on_v_model=edit_settings.set
+            ):
                 PlotSettingsEditDialog(
                     plot_settings,
                     selection.burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
-                    on_close=lambda: set_edit_settings(False),
+                    on_close=lambda: edit_settings.set(False),
                     duration=selection.burst_node.duration,
                 )
 
