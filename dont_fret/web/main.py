@@ -69,6 +69,8 @@ def Page():
     login_failed = solara.use_reactive(False)
     password = solara.use_reactive("")
 
+    solara.Style("style.css")
+
     def initialize():
         state.burst_settings.set({k: BurstColorList(v) for k, v in cfg.burst_search.items()})
 

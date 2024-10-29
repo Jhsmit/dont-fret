@@ -65,16 +65,23 @@ def find_index(items: list, **kwargs) -> int:
 
 
 def make_selector_nodes(
-    fret_nodes: list[FRETNode], attr: Literal["photons", "bursts"] = "photons"
+    fret_nodes: list[FRETNode],
+    attr: Literal["photons", "bursts"] = "photons",
+    require_children: bool = True,
 ) -> list[SelectorNode]:
     selector_nodes = []
     for fret_node in fret_nodes:
+        children = [
+            SelectorNode(value=n.id.hex, text=n.name) for n in getattr(fret_node, attr).items
+        ]
+
+        if require_children and not children:
+            continue
+
         node = SelectorNode(
             value=fret_node.id.hex,
             text=fret_node.name.value,
-            children=[
-                SelectorNode(value=n.id.hex, text=n.name) for n in getattr(fret_node, attr).items
-            ],
+            children=children,
         )
 
         selector_nodes.append(node)

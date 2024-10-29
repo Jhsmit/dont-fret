@@ -2,38 +2,40 @@ from __future__ import annotations
 
 import polars as pl
 import solara
+from solara.alias import rv
 
 import dont_fret.web.state as state
-from dont_fret.web.bursts.components import BurstFigure, BurstFilters
+from dont_fret.web.bursts.components import BurstFigure, FilterEditDialog, FilterListItem
 from dont_fret.web.methods import chain_filters
 
 
 @solara.component
 def BurstPage():
-    solara.Title(f"{state.APP_TITLE} / Plot 2D")
+    open_filter_dialog = solara.use_reactive(False)
+    solara.Title(f"{state.APP_TITLE} / Bursts")
     with solara.Sidebar():
-        with solara.Card():
-            solara.Text("download button")
-            # solara.FileDownload(
-            #     filtered_df.write_csv,
-            #     filename=f"{burst_item.name}{'_filtered' if state.filters.value else ''}_bursts.csv",
-            #     children=[
-            #         solara.Button(
-            #             "Download bursts csv",
-            #             block=True,
-            #         )
-            #     ],
-            # )
+        with solara.Card("Filters"):
+            solara.Button("Edit filters", on_click=lambda: open_filter_dialog.set(True), block=True)
+            with solara.v.List(dense=False):
+                for filter_item in state.filters.items:
+                    FilterListItem(filter_item)
 
-    # todo make them when needed,
-    # (delete when not anymore (no bursts) unlikely to happen)
-    # store in state module
+    if open_filter_dialog:
+        with solara.v.Dialog(
+            v_model=open_filter_dialog.value, max_width=1200, on_v_model=open_filter_dialog.set
+        ):
+            with solara.Card(style={"width": "1000px"}):
+                FilterEditDialog(
+                    # plot_settings,
+                    # selection.burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
+                    # on_close=lambda: set_edit_settings(False),
+                    # duration=selection.burst_node.duration,
+                )
+
     with solara.GridFixed(columns=2):
         BurstFigure(
             state.burst_figure_selection[0],
-            state.filters,
         )
         BurstFigure(
             state.burst_figure_selection[1],
-            state.filters,
         )

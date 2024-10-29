@@ -68,7 +68,7 @@ def burst_search(
 
 def chain_filters(filters: list[BurstFilterItem]) -> Union[pl.Expr, Literal[True]]:
     """Chain a list of `BurstFilterItem` objects into a single `pl.Expr` object."""
-    f_exprs = list(itertools.chain(*(f.as_expr() for f in filters)))
+    f_exprs = list(itertools.chain(*(f.as_expr() for f in filters if f.active)))
     if f_exprs:
         return reduce(and_, f_exprs)
     else:

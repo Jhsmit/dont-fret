@@ -102,6 +102,9 @@ class ListStore(Generic[T]):
         new_value[idx] = updated_item
         self._items.value = new_value
 
+    def index(self, item: T) -> int:
+        return self.items.index(item)
+
 
 @dataclasses.dataclass
 class FRETNode:

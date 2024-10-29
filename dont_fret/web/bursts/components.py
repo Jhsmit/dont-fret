@@ -111,19 +111,10 @@ def make_chart(df: pl.DataFrame, field: str, opacity: float = 1.0):
 def make_overlay_chart(
     df: pl.DataFrame, field: str, filters: list[BurstFilterItem]
 ) -> alt.LayerChart | alt.Chart:
-    # TODO chain filters (test)
-    # f = chain_filters(filters)
-    # df_f = df.filter(f)
-
-    all_exprs = list(chain(*[f.as_expr() for f in filters if f.active]))  # flatten
-    if all_exprs:
-        f_expr = reduce(and_, all_exprs)
-        df_f = df.filter(f_expr)
-    else:
-        df_f = df
+    f = chain_filters(filters)
+    df_f = df.filter(f)
 
     base_chart = make_chart(df, field, opacity=0.5)
-
     selection = alt.selection_interval(name="range", encodings=["x"])
 
     if len(df_f) > 0:
@@ -184,6 +175,7 @@ def FilterItemCard(filter_item: BurstFilterItem):
                 on_value=on_vmin,
                 vmax=filter_item.max,
                 vtype=float,
+                allow_none=True,
             )
 
             def on_vmax(value, filter_item=filter_item):
@@ -196,6 +188,7 @@ def FilterItemCard(filter_item: BurstFilterItem):
                 on_value=on_vmax,
                 vmin=filter_item.min,
                 vtype=float,
+                allow_none=True,
             )
 
 
@@ -430,7 +423,6 @@ def PlotSettingsEditDialog(
                 on_value=lambda val: copy.update(x_min=val),
                 vtype=float,
                 vmax=copy.value.x_max,
-                enable_restore=False,
             )
 
             RangeInputField(
@@ -439,7 +431,6 @@ def PlotSettingsEditDialog(
                 on_value=lambda val: copy.update(x_max=val),
                 vtype=float,
                 vmin=copy.value.x_min,
-                enable_restore=False,
             )
             solara.IconButton(
                 icon_name="mdi-auto-fix",
@@ -453,7 +444,6 @@ def PlotSettingsEditDialog(
                 on_value=lambda val: copy.update(y_min=val),
                 vtype=float,
                 vmax=copy.value.y_max,
-                enable_restore=False,
             )
 
             RangeInputField(
@@ -462,7 +452,6 @@ def PlotSettingsEditDialog(
                 on_value=lambda val: copy.update(y_max=val),
                 vtype=float,
                 vmin=copy.value.y_min,
-                enable_restore=False,
             )
 
             solara.IconButton(
@@ -479,7 +468,6 @@ def PlotSettingsEditDialog(
                     on_value=lambda val: copy.update(z_min=val),
                     vtype=float,
                     vmax=copy.value.z_max,
-                    enable_restore=False,
                     disabled=disabled,
                 )
                 RangeInputField(
@@ -488,7 +476,6 @@ def PlotSettingsEditDialog(
                     on_value=lambda val: copy.update(z_max=val),
                     vtype=float,
                     vmin=copy.value.z_min,
-                    enable_restore=False,
                     disabled=disabled,
                 )
 
@@ -711,7 +698,6 @@ def generate_figure(
 @solara.component
 def BurstFigure(
     selection: BurstFigureSelection,
-    global_filters: ListStore[BurstFilterItem],
 ):
     figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
     # edit_filter, set_edit_filter = solara.use_state(False)
@@ -722,16 +708,24 @@ def BurstFigure(
 
     dark_effective = solara.lab.use_dark_effective()
 
+    selected_file_names = [
+        node.name
+        for node in selection.burst_node.photon_nodes
+        if node.id.hex in selection.selected_files
+    ]
+    file_filter = pl.col("filename").is_in(selected_file_names)
+    f_expr = chain_filters(state.filters.items) & file_filter
+
     # this is triggered twice ? -> known plotly bug
     def redraw():
         # get the names of the files
-        selected_file_names = [
-            node.name
-            for node in selection.burst_node.photon_nodes
-            if node.id.hex in selection.selected_files
-        ]
-        file_filter = pl.col("filename").is_in(selected_file_names)
-        f_expr = chain_filters(global_filters.items) & file_filter
+        # selected_file_names = [
+        #     node.name
+        #     for node in selection.burst_node.photon_nodes
+        #     if node.id.hex in selection.selected_files
+        # ]
+        # file_filter = pl.col("filename").is_in(selected_file_names)
+        # f_expr = chain_filters(state.filters.items) & file_filter
         filtered_df = selection.burst_node.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
         figure = generate_figure(
@@ -746,7 +740,7 @@ def BurstFigure(
             selection.burst_id.value,
             selection.selected_files,
             plot_settings.value,
-            global_filters.items,
+            state.filters.items,
             dark_effective,
         ],
         intrusive_cancel=False,  # is much faster
@@ -794,10 +788,25 @@ def BurstFigure(
                     duration=selection.burst_node.duration,
                 )
 
-        # if edit_filter:
-        #     pass
-        # with rv.Dialog(v_model=edit_filter, max_width=750, on_v_model=set_edit_filter):
-        #     FileFilterDialog(
-        #         burst_item=burst_ref,
-        #         on_close=lambda: set_edit_filter(False),
-        #     )
+
+@solara.component
+def FilterListItem(filter_item):
+    with rv.ListItem():
+        rv.ListItemTitle(children=[filter_item.name])
+
+        def fmt(v):
+            if v is None:
+                return "None"
+            else:
+                return f"{v:.3g}"
+
+        rv.ListItemSubtitle(children=[f"{fmt(filter_item.min)} - {fmt(filter_item.max)}"])
+
+        def on_check(value: bool, filter_item=filter_item):
+            idx = state.filters.index(filter_item)
+            state.filters.update(idx, active=value)
+
+        solara.Checkbox(
+            value=filter_item.active,
+            on_value=on_check,
+        )
