@@ -240,7 +240,6 @@ def FilterEditDialog():
             selectors = NestedSelectors(
                 nodes=selector_nodes, selection=burst_node_choice, labels=labels
             )
-            # TODO make a class which yields setters/values for each selector
             with solara.Row():
                 for level in selectors:
                     solara.Select(**level)
