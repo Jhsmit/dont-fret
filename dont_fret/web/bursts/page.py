@@ -22,12 +22,7 @@ def BurstPage():
             v_model=open_filter_dialog.value, max_width=1200, on_v_model=open_filter_dialog.set
         ):
             with solara.Card(style={"width": "1000px"}):
-                FilterEditDialog(
-                    # plot_settings,
-                    # selection.burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
-                    # on_close=lambda: set_edit_settings(False),
-                    # duration=selection.burst_node.duration,
-                )
+                FilterEditDialog()
 
     with solara.GridFixed(columns=2):
         BurstFigure(
