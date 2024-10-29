@@ -14,10 +14,21 @@ import dont_fret.web.state as state
 from dont_fret import BinnedPhotonData, PhotonData
 from dont_fret.formatting import TRACE_COLORS, TRACE_SIGNS
 from dont_fret.web.methods import generate_traces
-from dont_fret.web.models import BurstNode, PhotonNode, TCSPCSettings, TraceSettings
+from dont_fret.web.models import (
+    BurstNode,
+    PhotonNode,
+    TCSPCSettings,
+    TraceSettings,
+)
 from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
 from dont_fret.web.trace.methods import create_tcspc_histogram
-from dont_fret.web.utils import find_object, get_photons, make_selector_nodes, wrap_callback
+from dont_fret.web.utils import (
+    NestedSelectors,
+    find_object,
+    get_photons,
+    make_selector_nodes,
+    wrap_callback,
+)
 
 # TODO move fret node / photon file reactives to module level
 TCSPC_SETTINGS = solara.Reactive(TCSPCSettings())
@@ -144,33 +155,10 @@ def TracePage():
     labels = ["Measurement", "Photons"]  # TODO move elsewhere
     TRACE_SETTINGS: solara.Reactive[TraceSettings] = solara.use_reactive(TraceSettings())
 
-    stack = selector_nodes
+    selectors = NestedSelectors(nodes=selector_nodes, selection=choice, labels=labels)
     with solara.Sidebar():
-        i = 0
-        while stack:
-            records = [node.record for node in stack]
-            if not records:
-                break
-
-            on_value = wrap_callback(choice.set_item, "item", idx=i)
-
-            val_stored = choice.get_item(i, None)
-            if val_stored in {v["value"] for v in records}:
-                value = val_stored
-            else:
-                value = records[0]["value"]
-                on_value(value)
-
-            solara.Select(
-                label=labels[i],
-                value=value,
-                on_value=on_value,
-                values=records,
-            )
-
-            selected_node = find_object(stack, value=value)
-            stack = selected_node.children
-            i += 1
+        for level in selectors:
+            solara.Select(**level)
 
     photon_node = get_photons(state.fret_nodes.items, choice.items)
     TraceFigure(photon_node, TRACE_SETTINGS.value)

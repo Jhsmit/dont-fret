@@ -1,10 +1,11 @@
 import time
 import uuid
+from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Literal, Optional, TypeVar
+from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, TypeVar
 
 from dont_fret.web.models import BurstNode, PhotonNode
-from dont_fret.web.new_models import FRETNode, SelectorNode
+from dont_fret.web.new_models import FRETNode, ListStore, SelectorNode
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -101,3 +102,38 @@ def get_bursts(fret_nodes: list[FRETNode], choice: list[str]) -> BurstNode:
     fret_node = find_object(fret_nodes, id=uuid.UUID(choice[0]))
     burst_node = find_object(fret_node.bursts.items, id=uuid.UUID(choice[1]))
     return burst_node
+
+
+@dataclass
+class NestedSelectors:
+    nodes: List[SelectorNode]
+    selection: ListStore[str]
+    labels: Optional[List[str]]
+
+    def __iter__(self) -> Iterator[Dict[str, Any]]:
+        stack = self.nodes
+        i = 0
+        while stack:
+            records = [node.record for node in stack]
+            if not records:
+                break
+
+            on_value = wrap_callback(self.selection.set_item, "item", idx=i)
+
+            val_stored = self.selection.get_item(i, None)
+            if val_stored in {v["value"] for v in records}:
+                value = val_stored
+            else:
+                value = records[0]["value"]
+                on_value(value)
+
+            if self.labels:
+                label = self.labels[i]
+            else:
+                label = f"Level {i}"
+
+            yield {"label": label, "value": value, "values": records, "on_value": on_value}
+
+            selected_node = find_object(stack, value=value)
+            stack = selected_node.children if selected_node else []
+            i += 1

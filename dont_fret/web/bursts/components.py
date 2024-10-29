@@ -27,6 +27,7 @@ from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstP
 from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
 from dont_fret.web.reactive import ReactiveFRETNodes
 from dont_fret.web.utils import (
+    NestedSelectors,
     find_index,
     find_object,
     get_bursts,
@@ -236,35 +237,13 @@ def FilterEditDialog():
     with solara.ColumnsResponsive([8, 4]):
         with solara.Card("Histogram"):
             labels = ["Measurement", "Bursts"]  # TODO move elsewhere
-
+            selectors = NestedSelectors(
+                nodes=selector_nodes, selection=burst_node_choice, labels=labels
+            )
             # TODO make a class which yields setters/values for each selector
             with solara.Row():
-                stack = selector_nodes
-                i = 0
-                while stack:
-                    records = [node.record for node in stack]
-                    if not records:
-                        break
-
-                    on_value = wrap_callback(burst_node_choice.set_item, "item", idx=i)
-
-                    val_stored = burst_node_choice.get_item(i, None)
-                    if val_stored in {v["value"] for v in records}:
-                        value = val_stored
-                    else:
-                        value = records[0]["value"]
-                        on_value(value)
-
-                    solara.Select(
-                        label=labels[i],
-                        value=value,
-                        values=records,
-                        on_value=on_value,
-                    )
-
-                    selected_node = find_object(stack, value=value)
-                    stack = selected_node.children
-                    i += 1
+                for level in selectors:
+                    solara.Select(**level)
 
             with solara.Row(style={"align-items": "center"}):
 

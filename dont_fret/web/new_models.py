@@ -10,7 +10,15 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Generic, Optional, ParamSpec, Type, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Generic,
+    Optional,
+    ParamSpec,
+    Type,
+    TypeVar,
+)
 
 import numpy as np
 import polars as pl

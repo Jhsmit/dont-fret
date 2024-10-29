@@ -31,8 +31,10 @@ snackbar = SnackbarReactive()
 # then we dont have to have burst search method for headless and web seperately
 
 
+from dont_fret.web.tmp_load import TEST_NODES
+
 # TODO refactor fret_store
-fret_nodes = FRETStore([])
+fret_nodes = FRETStore(TEST_NODES)
 
 burst_figure_selection = [
     BurstFigureSelection(fret_nodes),
