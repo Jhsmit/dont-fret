@@ -114,6 +114,14 @@ class ListStore(Generic[T]):
         return self.items.index(item)
 
 
+def use_liststore(initial_value: list[T]) -> ListStore[T]:
+    def make_liststore():
+        return ListStore(initial_value)
+
+    store = solara.use_memo(make_liststore, [])
+    return store
+
+
 @dataclasses.dataclass
 class FRETNode:
     name: solara.Reactive[str]  # displayed name

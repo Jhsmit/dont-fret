@@ -17,7 +17,7 @@ import dont_fret.web.state as state
 from dont_fret.web.components import FigureFromTask, RangeInputField, RegexSelectDialog
 from dont_fret.web.methods import chain_filters
 from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
-from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
+from dont_fret.web.new_models import FRETNode, FRETStore, ListStore, use_liststore
 from dont_fret.web.utils import (
     NestedSelectors,
     find_index,
@@ -190,10 +190,7 @@ def FilterEditDialog():
     existing_filter_fields = [f.name for f in state.filters]
     selector_nodes = make_selector_nodes(state.fret_nodes.items, attr="bursts")
 
-    def make_store():
-        return ListStore[str]([selector_nodes[0].value, selector_nodes[0].children[0].value])
-
-    burst_node_choice = solara.use_memo(make_store, [])
+    burst_node_choice = use_liststore([])
 
     def make_chart():
         burst_node = get_bursts(state.fret_nodes.items, burst_node_choice.items)
