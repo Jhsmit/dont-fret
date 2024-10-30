@@ -21,7 +21,7 @@ from solara.toestand import Ref
 
 import dont_fret.web.state as state
 from dont_fret.web.bursts.methods import create_histogram
-from dont_fret.web.components import RangeInputField
+from dont_fret.web.components import FigureFromTask, RangeInputField, RegexSelectDialog
 from dont_fret.web.methods import chain_filters
 from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
 from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
@@ -267,13 +267,15 @@ def FilterEditDialog():
 
 
 @solara.component
-def FileFilterDialog(
-    burst_item: solara.Reactive[BurstNode],
+def FileFilterDialogDepr(
+    value: list[str],
+    on_value: Callable[[list[str]], None],
+    values: list[str],
     on_close: Callable[[], None],
 ):
     """update; selected files is stored elsewhere now"""
     all_files = sorted(burst_item.value.df["filename"].unique())
-    local_selected_files = solara.use_reactive(cast(list[str], burst_item.value.selected_files))
+    local_selected_files = solara.use_reactive(value)
     error, set_error = solara.use_state("")
     regex, set_regex = solara.use_state("")
 
@@ -590,14 +592,6 @@ class BurstFigureSelection:
         self.selection_store.value = new_value
 
 
-# = VIEW
-# REFACTOR
-# def BurstFigure(
-# seletion: is not a simple dataclass with reactives only
-# node_tree = fret_store derived value which is updated when the node tree is updated (and thus reredner)
-# )
-
-
 def generate_figure(
     df: pl.DataFrame,
     plot_settings: BurstPlotSettings,
@@ -675,89 +669,87 @@ def generate_figure(
 
 @solara.component
 def BurstFigure(
-    selection: BurstFigureSelection,
+    selection: ListStore[str],
+    file_selection: dict[uuid.UUID, ListStore[str]],
 ):
-    figure, set_figure = solara.use_state(cast(Optional[go.Figure], None))
-    edit_settings = solara.use_reactive(False)
+    settings_dialog = solara.use_reactive(False)
+    file_filter_dialog = solara.use_reactive(False)
     plot_settings = solara.use_reactive(
         BurstPlotSettings()
-    )  # -> these reset to default, combine with burstfigureselection?
+    )  # -> these reset to default, move to global state?
 
     dark_effective = solara.lab.use_dark_effective()
 
-    selected_file_names = [
-        node.name
-        for node in selection.burst_node.photon_nodes
-        if node.id.hex in selection.selected_files
-    ]
-    file_filter = pl.col("filename").is_in(selected_file_names)
+    labels = ["Measurement", "Bursts"]  # TODO move elsewhere
+    selector_nodes = make_selector_nodes(state.fret_nodes.items, "bursts")
+    # making the levels populates the selection
+    levels = list(NestedSelectors(nodes=selector_nodes, selection=selection, labels=labels))
+    burst_node = get_bursts(state.fret_nodes.items, selection.items)
+    filenames = sorted(burst_node.df["filename"].unique())
+    if burst_node.id in file_selection:
+        file_store = file_selection[burst_node.id]
+    else:
+        file_store = ListStore(filenames)
+        file_selection[burst_node.id] = file_store
+
+    # file_store = file_selection[
+    #     burst_node.id
+    # ]  # we make a new one here if it doestn exist yet, but should be OK
+
+    # # it should never be empty, only after making a new one, thus we set it to all selected if its emtp
+
+    # solara.Text(str(burst_node.id))
+
+    file_filter = pl.col("filename").is_in(file_store.items)
     f_expr = chain_filters(state.filters.items) & file_filter
 
     # this is triggered twice ? -> known plotly bug, use .key(...)
     def redraw():
-        filtered_df = selection.burst_node.df.filter(f_expr)
+        print("redraw")
+        filtered_df = burst_node.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
         figure = generate_figure(
             filtered_df, plot_settings.value, binned_image=img, dark=dark_effective
         )
-        set_figure(figure)
+        return figure
 
-    # todo upgrade to use_task
-    fig_result = solara.use_thread(
+    figure_task = solara.lab.use_task(
         redraw,
-        dependencies=[
-            selection.burst_id.value,
-            selection.selected_files,
-            plot_settings.value,
-            state.filters.items,
-            dark_effective,
-        ],
-        intrusive_cancel=False,  # is much faster
+        dependencies=[burst_node.id, plot_settings.value, file_store.items, state.filters.items],
     )
 
     with solara.Card():
         with solara.Row():
-            solara.Select(
-                label="Measurement",  # TODO refactor to FRET node?
-                value=selection.fret_id.value.hex,
-                on_value=selection.set_fret_id,  # type: ignore
-                values=selection.fret_values,  # type: ignore
-            )
+            for level in levels:
+                solara.Select(**level)
 
-            solara.Select(
-                label="Burst item",
-                value=selection.burst_id.value.hex,
-                on_value=selection.set_burst_id,
-                values=selection.burst_values,  # type: ignore
+            solara.IconButton(
+                icon_name="mdi-file-star", on_click=lambda: file_filter_dialog.set(True)
             )
-            SelectCount(
-                label="Files",
-                value=selection.selected_files,
-                on_value=selection.set_selected_files,
-                items=selection.selected_files_values,  # type: ignore
-                item_name="file",
-            )
-            # solara.IconButton(icon_name="mdi-file-star", on_click=lambda: set_edit_filter(True))
-            solara.IconButton(icon_name="mdi-settings", on_click=lambda: edit_settings.set(True))
+            solara.IconButton(icon_name="mdi-settings", on_click=lambda: settings_dialog.set(True))
 
-        solara.ProgressLinear(fig_result.state == solara.ResultState.RUNNING)
-        if figure is not None:
-            with solara.Div(
-                style="opacity: 0.3" if fig_result.state == solara.ResultState.RUNNING else None
-            ):
-                solara.FigurePlotly(figure)
+        FigureFromTask(figure_task)
 
-        # dedent this and figure will flicker/be removed when opening the dialog
-        if edit_settings.value:
-            with rv.Dialog(
-                v_model=edit_settings.value, max_width=750, on_v_model=edit_settings.set
-            ):
-                PlotSettingsEditDialog(
-                    plot_settings,
-                    selection.burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
-                    on_close=lambda: edit_settings.set(False),
-                    duration=selection.burst_node.duration,
-                )
+    with solara.v.Dialog(
+        v_model=settings_dialog.value, max_width=750, on_v_model=settings_dialog.set
+    ):
+        PlotSettingsEditDialog(
+            plot_settings,
+            burst_node.df.filter(f_expr),  # = filtered dataframe by global filter
+            on_close=lambda: settings_dialog.set(False),
+            duration=burst_node.duration,
+        )
+
+    with solara.v.Dialog(
+        v_model=file_filter_dialog.value, max_width=750, on_v_model=file_filter_dialog.set
+    ):
+        RegexSelectDialog(
+            title="File Filter",
+            value=file_store.items,
+            on_value=file_store.set,
+            values=filenames,
+            on_close=lambda: file_filter_dialog.set(False),
+        )
 
 
 @solara.component

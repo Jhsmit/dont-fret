@@ -51,8 +51,8 @@ NO_DEFAULT = _NoDefault()
 class ListStore(Generic[T]):
     """baseclass for reactive list"""
 
-    def __init__(self, items: list[T]):
-        self._items = solara.reactive(items)
+    def __init__(self, items: Optional[list[T]] = None):
+        self._items = solara.reactive(items if items is not None else [])
 
     def __len__(self):
         return len(self.items)

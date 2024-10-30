@@ -13,6 +13,7 @@ from solara.alias import rv
 import dont_fret.web.state as state
 from dont_fret import BinnedPhotonData, PhotonData
 from dont_fret.formatting import TRACE_COLORS, TRACE_SIGNS
+from dont_fret.web.components import FigureFromTask
 from dont_fret.web.methods import generate_traces
 from dont_fret.web.models import (
     BurstNode,
@@ -85,6 +86,7 @@ class PhotonNodeSelection:
     )
 
     def __post_init__(self):
+        print("deprecate")
         # i want to remove this, we can check if the current id is in selection when accessing the property
         self.fret_store._items.subscribe(self.on_fret_store)
         self.reset()
@@ -163,17 +165,6 @@ def TracePage():
     photon_node = get_photons(state.fret_nodes.items, choice.items)
     TraceFigure(photon_node, TRACE_SETTINGS.value)
     TCSPCFigure(photon_node)
-
-
-@solara.component
-def FigureFromTask(task: solara.lab.Task):
-    solara.ProgressLinear(task.pending)
-    if task.latest is None:
-        solara.Text("loading...")
-    else:
-        figure = task.value if task.finished else task.latest
-        with solara.Div(style="opacity: 0.3" if task.pending else None):
-            solara.FigurePlotly(figure)
 
 
 @solara.component

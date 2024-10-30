@@ -17,17 +17,19 @@ def BurstPage():
                 for filter_item in state.filters.items:
                     FilterListItem(filter_item)
 
-    if open_filter_dialog:
-        with solara.v.Dialog(
-            v_model=open_filter_dialog.value, max_width=1200, on_v_model=open_filter_dialog.set
-        ):
-            with solara.Card(style={"width": "1000px"}):
-                FilterEditDialog()
+    # if open_filter_dialog:
+    with solara.v.Dialog(
+        v_model=open_filter_dialog.value, max_width=1200, on_v_model=open_filter_dialog.set
+    ):
+        with solara.Card(style={"width": "1190px"}):
+            FilterEditDialog()
 
     with solara.GridFixed(columns=2):
         BurstFigure(
             state.burst_figure_selection[0],
+            state.burst_figure_file_selection[0],
         )
         BurstFigure(
             state.burst_figure_selection[1],
+            state.burst_figure_file_selection[1],
         )

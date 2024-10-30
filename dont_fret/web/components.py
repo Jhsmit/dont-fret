@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Callable, Optional, Type
 
 import solara
@@ -114,3 +115,84 @@ def EditableTitle(initial: str | solara.Reactive[str], edit: bool | solara.React
 
     div = solara.Div(children=children)
     solara.v.use_event(div, "dblclick", handle)
+
+
+@solara.component
+def FigureFromTask(task: solara.lab.Task):
+    solara.ProgressLinear(task.pending)
+    if task.latest is None:
+        solara.Text("loading...")
+    else:
+        figure = task.value if task.finished else task.latest
+        with solara.Div(style="opacity: 0.3" if task.pending else None):
+            solara.FigurePlotly(figure)
+
+
+@solara.component
+def RegexSelectDialog(
+    title: str,
+    value: list[str],
+    on_value: Callable[[list[str]], None],
+    values: list[str],
+    on_close: Callable[[], None],
+    sort: bool = True,
+):
+    """
+    select string by checkboxes or regex
+    """
+    local_selection = solara.use_reactive(value)
+    error = solara.use_reactive("")
+    regex = solara.use_reactive("")
+
+    def on_input(value: str):
+        try:
+            pattern = re.compile(value)
+            regex.set(value)
+            error.set("")
+        except Exception:
+            error.set("Invalid regex")
+            return
+        new_selected = [f for f in values if pattern.search(f)]
+        local_selection.set(new_selected)
+
+    def on_save():
+        if not local_selection.value:
+            return
+        if sort:
+            on_value(sorted(local_selection.value))
+        else:
+            on_value(local_selection.value)
+        on_close()
+
+    with solara.Card(title):
+        with solara.Row(style="align-items: center;"):
+            solara.InputText(
+                label="regex",
+                value=regex.value,
+                on_value=on_input,
+                continuous_update=True,
+                error=error.value,
+            )
+            solara.Button(label="Select All", on_click=lambda: local_selection.set(values))
+            solara.Button(label="Select None", on_click=lambda: local_selection.set([]))
+        with solara.v.List(nav=True):
+            with solara.v.ListItemGroup(
+                v_model=local_selection.value,
+                on_v_model=local_selection.set,
+                multiple=True,
+            ):
+                for v in values:
+                    with solara.v.ListItem(value=v):
+                        with solara.v.ListItemAction():
+                            solara.Checkbox(value=v in local_selection.value)
+                        solara.v.ListItemTitle(children=[v])
+
+        with solara.CardActions():
+            solara.v.Spacer()
+            solara.Button(
+                "Save",
+                icon_name="mdi-content-save",
+                on_click=on_save,
+                disabled=not local_selection.value,
+            )
+            solara.Button("Close", icon_name="mdi-window-close", on_click=on_close)
