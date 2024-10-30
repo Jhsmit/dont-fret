@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import re
 import uuid
 from dataclasses import dataclass, field, replace
-from functools import reduce
-from itertools import chain
-from operator import and_
 from typing import Callable, Literal, Optional, TypeVar, cast
 
 import altair as alt
-import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
@@ -17,23 +12,18 @@ import solara
 import solara.lab
 from plotly.subplots import make_subplots
 from solara.alias import rv
-from solara.toestand import Ref
 
 import dont_fret.web.state as state
-from dont_fret.web.bursts.methods import create_histogram
 from dont_fret.web.components import FigureFromTask, RangeInputField, RegexSelectDialog
 from dont_fret.web.methods import chain_filters
 from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
 from dont_fret.web.new_models import FRETNode, FRETStore, ListStore
-from dont_fret.web.reactive import ReactiveFRETNodes
 from dont_fret.web.utils import (
     NestedSelectors,
     find_index,
     find_object,
     get_bursts,
     make_selector_nodes,
-    not_none,
-    wrap_callback,
 )
 
 N_STEP = 1000  # number slider steps
@@ -129,10 +119,10 @@ def make_overlay_chart(
 
 @solara.component
 def SelectionChart(chart: alt.Chart | alt.LayerChart, on_selection):
-    jchart = alt.JupyterChart.element(chart=chart, embed_options={"actions": False})
+    jchart = alt.JupyterChart.element(chart=chart, embed_options={"actions": False})  # type: ignore
 
     def bind():
-        widget = solara.get_widget(jchart)
+        widget = cast(alt.JupyterChart, solara.get_widget(jchart))
         widget.selections.observe(on_selection, "range")
 
     solara.use_effect(bind, [chart])
@@ -212,7 +202,7 @@ def FilterEditDialog():
 
     # note: cant be 100% sure but you could get some panicking threads when using
     # vegafusion in a use_task hook with prefer_threaded=True
-    task_chart = solara.lab.use_task(
+    task_chart = solara.lab.use_task(  # type: ignore
         make_chart,
         dependencies=[field.value, state.filters.items, burst_node_choice.items],
         prefer_threaded=False,
@@ -267,67 +257,6 @@ def FilterEditDialog():
 
 
 @solara.component
-def FileFilterDialogDepr(
-    value: list[str],
-    on_value: Callable[[list[str]], None],
-    values: list[str],
-    on_close: Callable[[], None],
-):
-    """update; selected files is stored elsewhere now"""
-    all_files = sorted(burst_item.value.df["filename"].unique())
-    local_selected_files = solara.use_reactive(value)
-    error, set_error = solara.use_state("")
-    regex, set_regex = solara.use_state("")
-
-    def on_input(value: str):
-        try:
-            pattern = re.compile(value)
-            set_error("")
-        except Exception:
-            set_error("Invalid regex")
-            set_regex(value)
-            return
-        new_selected = [f for f in all_files if pattern.search(f)]
-        local_selected_files.set(new_selected)
-
-    def on_save():
-        if not local_selected_files.value:
-            return
-        burst_item.update(selected_files=local_selected_files.value)
-        # selected_files.set(local_selected_files.value)
-        on_close()
-
-    with solara.Card("File Filter"):
-        with solara.Row(style="align-items: center;"):
-            solara.InputText(
-                label="regex", value=regex, on_value=on_input, continuous_update=True, error=error
-            )
-            solara.Button(label="Select All", on_click=lambda: local_selected_files.set(all_files))
-            solara.Button(label="Select None", on_click=lambda: local_selected_files.set([]))
-        with solara.v.List(nav=True):
-            with solara.v.ListItemGroup(
-                v_model=local_selected_files.value,
-                on_v_model=local_selected_files.set,
-                multiple=True,
-            ):
-                for filename in all_files:
-                    with solara.v.ListItem(value=filename):
-                        with solara.v.ListItemAction():
-                            solara.Checkbox(value=filename in local_selected_files.value)
-                        solara.v.ListItemTitle(children=[filename])
-
-        with solara.CardActions():
-            solara.v.Spacer()
-            solara.Button(
-                "Save",
-                icon_name="mdi-content-save",
-                on_click=on_save,
-                disabled=not local_selected_files.value,
-            )
-            solara.Button("Close", icon_name="mdi-window-close", on_click=on_close)
-
-
-@solara.component
 def PlotSettingsEditDialog(
     plot_settings: solara.Reactive[BurstPlotSettings],
     df: pl.DataFrame,
@@ -377,8 +306,11 @@ def PlotSettingsEditDialog(
 
     # only *some* of copy's attributes should trigger the redraw (specifically not z_min, z_max)
     redraw_attrs = ["x_name", "y_name", "x_min", "x_max", "y_min", "y_max", "nbinsx", "nbinsy"]
+
+    # TODO use_task
     bin_result = solara.use_thread(
-        rebin, dependencies=[getattr(copy.value, attr) for attr in redraw_attrs]
+        rebin,  # type: ignore
+        dependencies=[getattr(copy.value, attr) for attr in redraw_attrs],
     )
     disabled = bin_result.state == solara.ResultState.RUNNING
     with solara.Card("Plot Settings"):
@@ -705,7 +637,6 @@ def BurstFigure(
 
     # this is triggered twice ? -> known plotly bug, use .key(...)
     def redraw():
-        print("redraw")
         filtered_df = burst_node.df.filter(f_expr)
         img = BinnedImage.from_settings(filtered_df, plot_settings.value)
         figure = generate_figure(
@@ -713,7 +644,7 @@ def BurstFigure(
         )
         return figure
 
-    figure_task = solara.lab.use_task(
+    figure_task = solara.lab.use_task(  # type: ignore
         redraw,
         dependencies=[burst_node.id, plot_settings.value, file_store.items, state.filters.items],
     )

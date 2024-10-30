@@ -9,8 +9,6 @@ from solara.alias import rv
 
 import dont_fret.web.state as state
 
-# from dont_fret.web.methods import burst_search, combine_bursts, get_dataframe
-
 
 @solara.component
 def Snackbar():
@@ -114,11 +112,11 @@ def EditableTitle(initial: str | solara.Reactive[str], edit: bool | solara.React
         children = [solara.Text(title.value)]
 
     div = solara.Div(children=children)
-    solara.v.use_event(div, "dblclick", handle)
+    solara.v.use_event(div, "dblclick", handle)  # type: ignore
 
 
 @solara.component
-def FigureFromTask(task: solara.lab.Task):
+def FigureFromTask(task: solara.lab.Task):  # type: ignore
     solara.ProgressLinear(task.pending)
     if task.latest is None:
         solara.Text("loading...")

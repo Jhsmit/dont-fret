@@ -75,7 +75,8 @@ def Page():
     solara.Style(script_path / "style.css")
 
     def initialize():
-        state.burst_settings.set({k: BurstColorList(v) for k, v in cfg.burst_search.items()})
+        # TODO burst settings as listStore
+        state.burst_settings.set({k: BurstColorList(v) for k, v in cfg.burst_search.items()})  # type: ignore
 
         default_filters = copy.deepcopy(cfg.web.burst_filters)
         state.filters.set(default_filters)

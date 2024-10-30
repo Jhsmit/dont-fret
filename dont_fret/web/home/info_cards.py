@@ -17,10 +17,9 @@ from dont_fret.web.home.burst_settings import BurstSettingsDialog
 from dont_fret.web.home.methods import task_burst_search
 from dont_fret.web.methods import format_size
 from dont_fret.web.models import BurstNode, PhotonNode
-from dont_fret.web.new_models import FRETNode, ListStore
+from dont_fret.web.new_models import ListStore
 from dont_fret.web.reactive import (
     BurstSettingsReactive,
-    ReactiveFRETNodes,
 )
 
 
@@ -290,7 +289,7 @@ def PhotonNodeInfoCard(node_name: str, photon_node: PhotonNode, on_delete: Calla
         info = await state.data_manager.get_info(photon_node)
         return info
 
-    result = solara.lab.use_task(load_info, dependencies=[photon_node], prefer_threaded=False)
+    result = solara.lab.use_task(load_info, dependencies=[photon_node], prefer_threaded=False)  # type: ignore
 
     with solara.Card(f"{node_name} / Photon file / {photon_node.name}"):
         solara.ProgressLinear(result.pending and not loaded)

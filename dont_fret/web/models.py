@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import uuid
 from collections import UserList
-from dataclasses import dataclass, field, make_dataclass
+from dataclasses import dataclass, make_dataclass
 from pathlib import Path
 from typing import Callable, Optional, Tuple, TypedDict, TypeVar
 
@@ -12,8 +12,6 @@ import polars as pl
 import solara
 
 from dont_fret.config.config import BurstColor, BurstFilterItem
-from dont_fret.fileIO import PhotonFile
-from dont_fret.models import PhotonData
 
 BURST_SCHEMA = {
     "E_app": pl.Float64,
