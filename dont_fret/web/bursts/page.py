@@ -17,12 +17,15 @@ def BurstPage():
                 for filter_item in state.filters.items:
                     FilterListItem(filter_item)
 
-    # if open_filter_dialog:
     with solara.v.Dialog(
         v_model=open_filter_dialog.value, max_width=1200, on_v_model=open_filter_dialog.set
     ):
         with solara.Card(style={"width": "1190px"}):
-            FilterEditDialog()
+            # only place the dialog if its open otherwise altair chart won't show
+            if open_filter_dialog.value:
+                FilterEditDialog()
+            else:
+                pass
 
     with solara.GridFixed(columns=2):
         BurstFigure(
