@@ -62,6 +62,9 @@ if "--" in sys.argv:
     cfg.update(data)
 
 
+script_path = Path(__file__).parent
+
+
 @solara.component
 def Page():
     tab_selection = solara.use_reactive(0)
@@ -69,7 +72,7 @@ def Page():
     login_failed = solara.use_reactive(False)
     password = solara.use_reactive("")
 
-    solara.Style("style.css")
+    solara.Style(script_path / "style.css")
 
     def initialize():
         state.burst_settings.set({k: BurstColorList(v) for k, v in cfg.burst_search.items()})
