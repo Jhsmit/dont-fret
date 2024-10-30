@@ -38,13 +38,13 @@ from dont_fret.web.tmp_load import TEST_NODES
 fret_nodes = FRETStore(TEST_NODES)
 
 burst_figure_selection = [
-    ListStore[str]([]),
-    ListStore[str]([]),
+    ListStore[str](),
+    ListStore[str](),
 ]
 
 burst_figure_file_selection = [{}, {}]
 
-trace_selection = PhotonNodeSelection(fret_nodes)
+trace_selection = ListStore[str]()
 
 # cfg set to dask manager
 data_manager = ThreadedDataManager()

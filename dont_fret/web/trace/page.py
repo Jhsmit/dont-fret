@@ -145,10 +145,6 @@ class PhotonNodeSelection:
         return [{"text": node.name, "value": node.id.hex} for node in self.fret_node.photons]
 
 
-# move to global state
-choice = ListStore[str]([])
-
-
 @solara.component
 def TracePage():
     solara.Title(f"{state.APP_TITLE} / Trace")
@@ -157,12 +153,14 @@ def TracePage():
     labels = ["Measurement", "Photons"]  # TODO move elsewhere
     TRACE_SETTINGS: solara.Reactive[TraceSettings] = solara.use_reactive(TraceSettings())
 
-    selectors = NestedSelectors(nodes=selector_nodes, selection=choice, labels=labels)
+    selectors = NestedSelectors(
+        nodes=selector_nodes, selection=state.trace_selection, labels=labels
+    )
     with solara.Sidebar():
         for level in selectors:
             solara.Select(**level)
 
-    photon_node = get_photons(state.fret_nodes.items, choice.items)
+    photon_node = get_photons(state.fret_nodes.items, state.trace_selection.items)
     TraceFigure(photon_node, TRACE_SETTINGS.value)
     TCSPCFigure(photon_node)
 
