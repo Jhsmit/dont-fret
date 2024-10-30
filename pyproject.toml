@@ -31,6 +31,9 @@ dependencies = [
     "click",
     "solara>=1.19.0",
     "plotly",
+    "altair",
+    "anywidget",
+    "vegafusion[embed]"
 ]
 dynamic = ["version"]
 
