@@ -21,6 +21,7 @@ from dont_fret.web.new_models import ListStore
 from dont_fret.web.reactive import (
     BurstSettingsReactive,
 )
+from dont_fret.web.utils import has_photons
 
 
 @solara.component
@@ -48,6 +49,7 @@ def PhotonInfoCard(
     burst_settings: BurstSettingsReactive,
     # open_: solara.Reactive[list[str]],
 ):
+    # todo reactives
     bs_name, set_bs_name = solara.use_state(next(iter(burst_settings.value.keys())))
     add_new, set_add_new = solara.use_state(False)
     show_settings_dialog, set_show_settings_dialog = solara.use_state(False)
@@ -92,10 +94,13 @@ def PhotonInfoCard(
         current_names = [ph.name for ph in photon_store.items]
         to_add = [PhotonNode(file_path=pth) for pth in files if pth.name not in current_names]
         # TODO sort ?
+
         photon_store.extend(to_add)
+        state.disable_trace_page.set(not has_photons(state.fret_nodes.items))
 
     def remove_all_files(*ignore):
         photon_store.set([])
+        state.disable_trace_page.set(not has_photons(state.fret_nodes.items))
 
     def confirm_burst_search():
         # TODO needs to be passed as callable as well

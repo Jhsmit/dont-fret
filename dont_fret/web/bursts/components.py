@@ -188,14 +188,23 @@ def FilterEditDialog():
     field = solara.use_reactive(DEFAULT_FIELD)
     chart_selection = solara.use_reactive(None)
     existing_filter_fields = [f.name for f in state.filters]
-    selector_nodes = make_selector_nodes(state.fret_nodes.items, attr="bursts")
 
     burst_node_choice = use_liststore([])
+    selector_nodes = make_selector_nodes(state.fret_nodes.items, attr="bursts")
+    selectors = NestedSelectors(
+        nodes=selector_nodes, selection=burst_node_choice, labels=["Measurement", "Bursts"]
+    )
+    levels = list(selectors)
+    burst_node = get_bursts(state.fret_nodes.items, burst_node_choice.items)
 
     def make_chart():
-        burst_node = get_bursts(state.fret_nodes.items, burst_node_choice.items)
         new_chart = make_overlay_chart(burst_node.df, field.value, state.filters.items)
         return new_chart
+
+    def on_download():
+        f = chain_filters(state.filters.items)
+        df_f = burst_node.df.filter(f)
+        return df_f.write_csv()
 
     # note: cant be 100% sure but you could get some panicking threads when using
     # vegafusion in a use_task hook with prefer_threaded=True
@@ -223,13 +232,15 @@ def FilterEditDialog():
 
     with solara.ColumnsResponsive([8, 4]):
         with solara.Card("Histogram"):
-            labels = ["Measurement", "Bursts"]  # TODO move elsewhere
-            selectors = NestedSelectors(
-                nodes=selector_nodes, selection=burst_node_choice, labels=labels
-            )
-            with solara.Row():
-                for level in selectors:
+            with solara.Row(style={"align-items": "center"}):
+                for level in levels:
                     solara.Select(**level)
+
+                with solara.FileDownload(
+                    on_download, filename=f"{burst_node.name}_filtered_bursts.csv"
+                ):
+                    with solara.Tooltip("Download filtered data as .csv"):
+                        solara.IconButton("mdi-file-download", on_click=on_download)
 
             with solara.Row(style={"align-items": "center"}):
 
@@ -240,7 +251,8 @@ def FilterEditDialog():
                 solara.Select(
                     label="Field", value=field.value, values=FIELD_OPTIONS, on_value=on_field
                 )
-                solara.IconButton("mdi-filter-plus", on_click=filter_from_selection)
+                with solara.Tooltip("Add or edit filter"):
+                    solara.IconButton("mdi-filter-plus", on_click=filter_from_selection)
             if task_chart.latest is None:
                 solara.Text("loading...")
             else:
@@ -620,14 +632,6 @@ def BurstFigure(
     else:
         file_store = ListStore(filenames)
         file_selection[burst_node.id] = file_store
-
-    # file_store = file_selection[
-    #     burst_node.id
-    # ]  # we make a new one here if it doestn exist yet, but should be OK
-
-    # # it should never be empty, only after making a new one, thus we set it to all selected if its emtp
-
-    # solara.Text(str(burst_node.id))
 
     file_filter = pl.col("filename").is_in(file_store.items)
     f_expr = chain_filters(state.filters.items) & file_filter

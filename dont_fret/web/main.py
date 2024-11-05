@@ -3,6 +3,7 @@ import copy
 import sys
 from pathlib import Path
 
+import altair as alt
 import solara
 import solara.lab
 import solara.server.settings
@@ -10,12 +11,13 @@ import yaml
 
 import dont_fret.web.state as state
 from dont_fret.config import cfg
-from dont_fret.web.bursts import BurstPage
 from dont_fret.web.components import Snackbar
-from dont_fret.web.home import HomePage
 from dont_fret.web.models import BurstColorList
 from dont_fret.web.new_models import FRETNode
-from dont_fret.web.trace import TracePage
+from dont_fret.web.state import PAGES
+
+# config option?
+alt.data_transformers.enable("vegafusion")
 
 
 def disable_bursts(nodes: list[FRETNode]) -> bool:
@@ -24,31 +26,6 @@ def disable_bursts(nodes: list[FRETNode]) -> bool:
 
 def disable_trace(nodes: list[FRETNode]) -> bool:
     return not any([n.photons for n in nodes])
-
-
-pages = [
-    {
-        "name": "home",
-        "main": HomePage,
-        "sidebar": None,
-        "disabled": lambda x: False,
-        "show": lambda: True,
-    },
-    {
-        "name": "bursts",
-        "main": BurstPage,
-        "sidebar": None,
-        "disabled": disable_bursts,
-        "show": lambda: True,
-    },
-    {
-        "name": "trace",
-        "main": TracePage,
-        "sidebar": None,
-        "disabled": disable_trace,
-        "show": lambda: True,
-    },
-]
 
 
 parser = argparse.ArgumentParser(description="Process config argument")
@@ -98,6 +75,16 @@ def Page():
         else:
             login_failed.set(True)
 
+    # has_photons = [node for node in state.fret_nodes if node.photons]
+    # has_bursts = [node for node in state.fret_nodes if node.bursts]
+
+    # for node in state.fret_nodes:
+    #     solara.Text(str(node.photons.items))
+
+    # solara.Text(str(has_photons))
+
+    # solara.Text(str(PAGES[2]["disabled"].value))
+
     # it is important we do not interrupt the height 100% chain
     # to ensure independent scrolling for both columns
     with solara.Column(style={"height": "100%"}):
@@ -107,16 +94,14 @@ def Page():
             with solara.lab.Tabs(
                 value=tab_selection.value, on_value=tab_selection.set, align="center"
             ):
-                for page in pages:
+                for page in PAGES:
                     if page["show"]():
-                        solara.lab.Tab(
-                            page["name"], disabled=page["disabled"](state.fret_nodes.items)
-                        )
+                        solara.lab.Tab(page["name"], disabled=page["disabled"].value)
         solara.Title(state.APP_TITLE)
 
         if authorized.value:
-            pages[tab_selection.value]["main"]()
-            sidebar = pages[tab_selection.value]["sidebar"]
+            PAGES[tab_selection.value]["main"]()
+            sidebar = PAGES[tab_selection.value]["sidebar"]
             if sidebar is not None:
                 sidebar()
         else:

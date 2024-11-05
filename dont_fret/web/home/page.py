@@ -18,6 +18,7 @@ from dont_fret.web.home.info_cards import (
 from dont_fret.web.methods import to_treeview
 from dont_fret.web.models import BurstNode, PhotonNode
 from dont_fret.web.new_models import FRETNode
+from dont_fret.web.utils import has_bursts, has_photons
 
 welcome_text = """# Don't FRET!
 
@@ -155,6 +156,7 @@ def HomePage():
                     # set the active id to the parent node before deleting
                     active_id.set([f"{selection.f_idx}:{selection.node_type}"])
                     fret_node.photons.pop(p_node_idx)  # type: ignore
+                    state.disable_trace_page.set(not has_photons(state.fret_nodes.items))
 
                 PhotonNodeInfoCard(fret_node.name.value, photon_node, delete_photon)
 
@@ -168,5 +170,6 @@ def HomePage():
                     # set the active id to the parent node before deleting
                     active_id.set([f"{selection.f_idx}:{selection.node_type}"])
                     fret_node.bursts.pop(b_node_idx)  # type: ignore
+                    state.disable_burst_page.set(not has_bursts(state.fret_nodes.items))
 
                 BurstItemInfoCard(fret_node.name.value, burst_node, delete_burst)

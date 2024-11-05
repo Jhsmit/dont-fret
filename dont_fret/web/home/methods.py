@@ -4,6 +4,7 @@ import solara.lab
 import dont_fret.web.state as state
 from dont_fret.web.methods import get_duration
 from dont_fret.web.models import BurstNode, PhotonNode
+from dont_fret.web.utils import has_bursts
 
 
 # todo pass callable to add item on done
@@ -27,6 +28,7 @@ async def task_burst_search(name: str, photon_nodes: list[PhotonNode], burst_sto
             name=name, df=df, colors=burst_colors, photon_nodes=photon_nodes, duration=duration
         )
         burst_store.append(burst_node)
+        state.disable_burst_page.set(not has_bursts(state.fret_nodes.items))
 
         state.snackbar.success(
             f"Burst search completed, found {len(burst_node.df)} bursts", timeout=0
