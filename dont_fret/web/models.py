@@ -15,6 +15,7 @@ from solara.toestand import merge_state
 from dont_fret.config.config import BurstColor, BurstFilterItem
 
 T = TypeVar("T")
+R = TypeVar("R")
 
 BURST_SCHEMA = {
     "E_app": pl.Float64,
