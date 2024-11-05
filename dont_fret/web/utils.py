@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, TypeVar
 
-from dont_fret.web.models import BurstNode, PhotonNode
-from dont_fret.web.new_models import FRETNode, ListStore, SelectorNode
+from dont_fret.web.models import BurstNode, FRETNode, ListStore, PhotonNode, SelectorNode
 
 T = TypeVar("T")
 V = TypeVar("V")

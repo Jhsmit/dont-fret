@@ -7,11 +7,8 @@ import threading
 import uuid
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
 from typing import (
-    TYPE_CHECKING,
     Callable,
-    ContextManager,
     Generic,
     Optional,
     ParamSpec,
@@ -20,8 +17,6 @@ from typing import (
 
 import numpy as np
 import polars as pl
-import solara
-from solara.toestand import merge_state
 
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
@@ -31,167 +26,6 @@ from dont_fret.web.models import BurstNode, PhotonNode
 
 T = TypeVar("T")
 R = TypeVar("R")
-
-
-class _NoDefault:
-    """Sentinel class to distinguish between no default and None as default"""
-
-    pass
-
-
-NO_DEFAULT = _NoDefault()
-
-
-class ListStore(Generic[T]):
-    """baseclass for reactive list"""
-
-    def __init__(self, items: Optional[list[T]] = None):
-        self._items = solara.reactive(items if items is not None else [])
-
-    def __len__(self):
-        return len(self.items)
-
-    def __getitem__(self, idx: int) -> T:
-        return self.items[idx]
-
-    def __iter__(self):
-        return iter(self.items)
-
-    @property
-    def items(self):
-        return self._items.value
-
-    def get_item(self, idx: int, default: R = NO_DEFAULT) -> T | R:
-        try:
-            return self._items.value[idx]
-        except IndexError:
-            if default is NO_DEFAULT:
-                raise IndexError(f"Index {idx} is out of range")
-            return default
-
-    def set(self, items: list[T]) -> None:
-        self._items.value = items
-
-    def set_item(self, idx: int, item: T) -> None:
-        new_items = self._items.value.copy()
-        if idx == len(new_items):
-            new_items.append(item)
-        elif idx < len(new_items):
-            new_items[idx] = item
-        else:
-            raise IndexError(f"Index {idx} is out of range")
-        self._items.value = new_items
-
-    def append(self, item: T) -> None:
-        self._items.value = [*self._items.value, item]
-
-    def extend(self, items: list[T]) -> None:
-        new_value = self.items.copy()
-        new_value.extend(items)
-        self._items.value = new_value
-
-    def pop(self, idx: int) -> T:
-        item = self.items[idx]
-        self._items.value = self.items[:idx] + self.items[idx + 1 :]
-        return item
-
-    def remove(self, item: T) -> None:
-        self._items.value = [it for it in self.items if it != item]
-
-    def update(self, idx: int, **kwargs):
-        new_value = self.items.copy()
-        updated_item = merge_state(new_value[idx], **kwargs)
-        new_value[idx] = updated_item
-        self._items.value = new_value
-
-    def index(self, item: T) -> int:
-        return self.items.index(item)
-
-    def subscribe(
-        self, listener: Callable[[list[T]], None], scope: Optional[ContextManager] = None
-    ):
-        return self._items.subscribe(listener, scope=scope)
-
-    def subscribe_change(
-        self, listener: Callable[[list[T], list[T]], None], scope: Optional[ContextManager] = None
-    ):
-        return self._items.subscribe_change(listener, scope=scope)
-
-
-def use_liststore(value: list[T] | ListStore[T]) -> ListStore[T]:
-    """use_reactive for liststore"""
-
-    def make_liststore():
-        if not isinstance(value, ListStore):
-            return ListStore(value)
-
-    store = solara.use_memo(make_liststore, [])
-    if isinstance(value, ListStore):
-        store = value
-    assert store is not None
-
-    return store
-
-
-@dataclasses.dataclass
-class FRETNode:
-    name: solara.Reactive[str]  # displayed name
-    id: uuid.UUID = dataclasses.field(default_factory=lambda: uuid.uuid4())
-    description: solara.Reactive[str] = dataclasses.field(
-        default_factory=lambda: solara.reactive("")
-    )
-    photons: ListStore[PhotonNode] = dataclasses.field(default_factory=lambda: ListStore([]))
-    bursts: ListStore[BurstNode] = dataclasses.field(default_factory=lambda: ListStore([]))
-
-
-class FRETStore(ListStore[FRETNode]):
-    def __init__(self, nodes: list[FRETNode]):
-        super().__init__(nodes)
-
-    def new_node(self, name: solara.Optional[str] = None) -> None:
-        name = name or self.get_default_name()
-        node = FRETNode(name=solara.Reactive(name))
-        self.append(node)
-
-    def get_node(self, node_id: str) -> FRETNode:
-        for node in self.items:
-            if node.id == node_id:
-                return node
-
-        raise ValueError(f"Node with id {node_id} not found.")
-
-    def get_default_name(self) -> str:
-        num_dic = {
-            1: "TOO",
-            2: "THREE",
-            3: "FOUR",
-            4: "FIVE",
-            5: "SIX",
-            6: "SEVEN",
-            7: "EIGHT",
-            8: "NINE",
-            9: "TEN",
-        }
-
-        if len(self) == 0:
-            return "FRET NOT"
-        else:
-            return f"FRET {num_dic.get(len(self), len(self) + 1)}"
-
-
-@dataclass
-class SelectorNode:
-    value: str
-    text: Optional[str] = None
-    children: list[SelectorNode] = field(default_factory=list)
-
-    def __post_init__(self):
-        if self.text is None:
-            self.text = self.value
-
-    @property
-    def record(self) -> dict:
-        return {"text": self.text, "value": self.value}
 
 
 class DaskDataManager:

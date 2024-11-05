@@ -16,8 +16,16 @@ from solara.alias import rv
 import dont_fret.web.state as state
 from dont_fret.web.components import FigureFromTask, RangeInputField, RegexSelectDialog
 from dont_fret.web.methods import chain_filters
-from dont_fret.web.models import BinnedImage, BurstFilterItem, BurstNode, BurstPlotSettings
-from dont_fret.web.new_models import FRETNode, FRETStore, ListStore, use_liststore
+from dont_fret.web.models import (
+    BinnedImage,
+    BurstFilterItem,
+    BurstNode,
+    BurstPlotSettings,
+    FRETNode,
+    FRETStore,
+    ListStore,
+    use_liststore,
+)
 from dont_fret.web.utils import (
     NestedSelectors,
     find_index,
@@ -618,7 +626,7 @@ def BurstFigure(
     file_filter_dialog = solara.use_reactive(False)
     plot_settings = solara.use_reactive(
         BurstPlotSettings()
-    )  # -> these reset to default, move to global state?
+    )  # -> these reset to default, move to global state? pass as kwarg?
 
     selection = use_liststore(selection if selection is not None else [])
     file_selection = {} if file_selection is None else file_selection

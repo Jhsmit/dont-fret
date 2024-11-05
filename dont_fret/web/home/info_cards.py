@@ -17,7 +17,7 @@ from dont_fret.web.home.burst_settings import BurstSettingsDialog
 from dont_fret.web.home.methods import task_burst_search
 from dont_fret.web.methods import format_size
 from dont_fret.web.models import BurstNode, PhotonNode
-from dont_fret.web.new_models import ListStore
+from dont_fret.web.models import ListStore
 from dont_fret.web.reactive import (
     BurstSettingsReactive,
 )

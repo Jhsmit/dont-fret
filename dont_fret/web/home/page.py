@@ -16,8 +16,7 @@ from dont_fret.web.home.info_cards import (
     PhotonNodeInfoCard,
 )
 from dont_fret.web.methods import to_treeview
-from dont_fret.web.models import BurstNode, PhotonNode
-from dont_fret.web.new_models import FRETNode
+from dont_fret.web.models import BurstNode, FRETNode, PhotonNode
 from dont_fret.web.utils import has_bursts, has_photons
 
 welcome_text = """# Don't FRET!

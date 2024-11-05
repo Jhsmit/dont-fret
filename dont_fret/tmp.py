@@ -19,8 +19,7 @@ from dont_fret.web.bursts.components import BurstFigure, BurstFigureSelection
 from dont_fret.web.components import RegexSelectDialog
 from dont_fret.web.home import HomePage
 from dont_fret.web.main import Page as MainPage
-from dont_fret.web.models import BurstNode, PhotonNode
-from dont_fret.web.new_models import FRETNode, ListStore, SelectorNode, SyncDataManager
+from dont_fret.web.models import BurstNode, ListStore, PhotonNode
 from dont_fret.web.trace import TracePage
 from dont_fret.web.utils import (
     find_index,
