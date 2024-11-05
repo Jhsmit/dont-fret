@@ -12,7 +12,7 @@ from dont_fret.models import PhotonData
 from dont_fret.web.models import BurstFilterItem
 
 if TYPE_CHECKING:
-    from dont_fret.web.new_models import FRETNode
+    from dont_fret.web.datamanager import FRETNode
 
 
 def chain_filters(filters: list[BurstFilterItem]) -> Union[pl.Expr, Literal[True]]:

@@ -8,6 +8,7 @@ from dont_fret.web.utils import has_bursts
 
 
 # todo pass callable to add item on done
+# todo pass callable to add item on done
 @solara.lab.task(prefer_threaded=False)  # type: ignore
 async def task_burst_search(name: str, photon_nodes: list[PhotonNode], burst_store) -> None:
     # name: name of burst search settings as well as its output name
@@ -16,22 +17,19 @@ async def task_burst_search(name: str, photon_nodes: list[PhotonNode], burst_sto
         task_burst_search.progress = progress
 
     burst_colors = list(state.burst_settings.value[name])
-    df = await state.data_manager.get_dataframe(photon_nodes, burst_colors, on_progress)
 
-    if len(df) == 0:
+    try:
+        burst_node = await state.data_manager.get_burst_node(
+            photon_nodes, burst_colors, name, on_progress
+        )
+    except ValueError:
         state.snackbar.warning("No bursts found", timeout=0)
-    else:
-        # getting info should be fast / non_blocking since photons are cached
-        info_list = [await state.data_manager.get_info(ph_node) for ph_node in photon_nodes]
-        duration = get_duration(info_list)
-        burst_node = BurstNode(
-            name=name, df=df, colors=burst_colors, photon_nodes=photon_nodes, duration=duration
-        )
-        burst_store.append(burst_node)
-        state.disable_burst_page.set(not has_bursts(state.fret_nodes.items))
+        task_burst_search.progress = False
+        return
 
-        state.snackbar.success(
-            f"Burst search completed, found {len(burst_node.df)} bursts", timeout=0
-        )
+    burst_store.append(burst_node)
+    state.disable_burst_page.set(not has_bursts(state.fret_nodes.items))
+
+    state.snackbar.success(f"Burst search completed, found {len(burst_node.df)} bursts", timeout=0)
 
     task_burst_search.progress = False
