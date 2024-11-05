@@ -39,5 +39,5 @@ data_manager = ThreadedDataManager()
 
 # maybe check this via subscribe on the liststores ?
 # -> make sure we can use the classes in different contexts
-disable_trace_page = solara.Reactive(False)
-disable_burst_page = solara.Reactive(False)
+disable_trace_page = solara.Reactive(True)
+disable_burst_page = solara.Reactive(True)
