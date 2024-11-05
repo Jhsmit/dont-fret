@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import dataclasses
 import json
 import threading
@@ -9,14 +8,13 @@ import uuid
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Callable,
+    ContextManager,
     Generic,
     Optional,
     ParamSpec,
-    Type,
     TypeVar,
 )
 
@@ -25,15 +23,11 @@ import polars as pl
 import solara
 from solara.toestand import merge_state
 
-from dont_fret.config import cfg
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
 from dont_fret.web.methods import get_duration, get_info
-from dont_fret.web.models import BurstColorList, BurstNode, PhotonNode
-
-if TYPE_CHECKING:
-    from dont_fret.web.reactive import BurstSettingsReactive, ReactiveFRETNodes, SnackbarReactive
+from dont_fret.web.models import BurstNode, PhotonNode
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -112,6 +106,16 @@ class ListStore(Generic[T]):
 
     def index(self, item: T) -> int:
         return self.items.index(item)
+
+    def subscribe(
+        self, listener: Callable[[list[T]], None], scope: Optional[ContextManager] = None
+    ):
+        return self._items.subscribe(listener, scope=scope)
+
+    def subscribe_change(
+        self, listener: Callable[[list[T], list[T]], None], scope: Optional[ContextManager] = None
+    ):
+        return self._items.subscribe_change(listener, scope=scope)
 
 
 def use_liststore(initial_value: list[T]) -> ListStore[T]:
@@ -534,7 +538,7 @@ class ThreadedDataManager:
 import asyncio
 import threading
 from functools import wraps
-from typing import Callable, Optional, Union
+from typing import Callable, Optional
 
 
 class SyncDataManager:

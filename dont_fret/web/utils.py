@@ -104,6 +104,14 @@ def get_bursts(fret_nodes: list[FRETNode], choice: list[str]) -> BurstNode:
     return burst_node
 
 
+def has_photons(nodes: list[FRETNode]) -> bool:
+    return any([n.photons for n in nodes])
+
+
+def has_bursts(nodes: list[FRETNode]) -> bool:
+    return any([n.bursts for n in nodes])
+
+
 @dataclass
 class NestedSelectors:
     nodes: List[SelectorNode]

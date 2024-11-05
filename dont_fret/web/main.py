@@ -11,21 +11,15 @@ import yaml
 
 import dont_fret.web.state as state
 from dont_fret.config import cfg
+from dont_fret.web.bursts import BurstPage
 from dont_fret.web.components import Snackbar
+from dont_fret.web.home import HomePage
 from dont_fret.web.models import BurstColorList
-from dont_fret.web.new_models import FRETNode
-from dont_fret.web.state import PAGES
+from dont_fret.web.state import disable_burst_page, disable_trace_page
+from dont_fret.web.trace import TracePage
 
 # config option?
 alt.data_transformers.enable("vegafusion")
-
-
-def disable_bursts(nodes: list[FRETNode]) -> bool:
-    return not any([n.bursts for n in nodes])
-
-
-def disable_trace(nodes: list[FRETNode]) -> bool:
-    return not any([n.photons for n in nodes])
 
 
 parser = argparse.ArgumentParser(description="Process config argument")
@@ -39,7 +33,30 @@ if "--" in sys.argv:
     cfg.update(data)
 
 
-script_path = Path(__file__).parent
+SCRIPT_PATH = Path(__file__).parent
+PAGES = [
+    {
+        "name": "home",
+        "main": HomePage,
+        "sidebar": None,
+        "disabled": solara.Reactive(False),  # always false
+        "show": lambda: True,
+    },
+    {
+        "name": "bursts",
+        "main": BurstPage,
+        "sidebar": None,
+        "disabled": disable_burst_page,
+        "show": lambda: True,
+    },
+    {
+        "name": "trace",
+        "main": TracePage,
+        "sidebar": None,
+        "disabled": disable_trace_page,
+        "show": lambda: True,
+    },
+]
 
 
 @solara.component
@@ -49,7 +66,7 @@ def Page():
     login_failed = solara.use_reactive(False)
     password = solara.use_reactive("")
 
-    solara.Style(script_path / "style.css")
+    solara.Style(SCRIPT_PATH / "style.css")
 
     def initialize():
         # TODO burst settings as listStore
@@ -75,15 +92,7 @@ def Page():
         else:
             login_failed.set(True)
 
-    # has_photons = [node for node in state.fret_nodes if node.photons]
-    # has_bursts = [node for node in state.fret_nodes if node.bursts]
-
-    # for node in state.fret_nodes:
-    #     solara.Text(str(node.photons.items))
-
-    # solara.Text(str(has_photons))
-
-    # solara.Text(str(PAGES[2]["disabled"].value))
+    # has_photons = [node for node in state.fr--
 
     # it is important we do not interrupt the height 100% chain
     # to ensure independent scrolling for both columns

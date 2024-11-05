@@ -20,11 +20,10 @@ burst_settings = BurstSettingsReactive(
 filters = ListStore(copy.deepcopy(cfg.web.burst_filters))
 snackbar = SnackbarReactive()
 
-# from dont_fret.web.tmp_load import TEST_NODES
-# fret_nodes = FRETStore(TEST_NODES)
-fret_nodes = FRETStore([])
+from dont_fret.web.tmp_load import TEST_NODES
 
-# TODO refactor fret_store
+fret_nodes = FRETStore(TEST_NODES)
+# fret_nodes = FRETStore([])
 
 burst_figure_selection = [
     ListStore[str](),
@@ -37,3 +36,8 @@ trace_selection = ListStore[str]()
 
 # cfg set to dask manager
 data_manager = ThreadedDataManager()
+
+# maybe check this via subscribe on the liststores ?
+# -> make sure we can use the classes in different contexts
+disable_trace_page = solara.Reactive(False)
+disable_burst_page = solara.Reactive(False)
