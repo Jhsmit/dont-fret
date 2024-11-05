@@ -43,6 +43,9 @@ my_selection = ListStore([])
 
 values = ["a", "b1", "c1", "d3"]
 
+state.disable_burst_page.set(False)
+state.disable_trace_page.set(False)
+
 
 @solara.component
 def Page():
