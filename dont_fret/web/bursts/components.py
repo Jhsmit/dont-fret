@@ -610,8 +610,9 @@ def generate_figure(
 
 @solara.component
 def BurstFigure(
-    selection: ListStore[str],
-    file_selection: dict[uuid.UUID, ListStore[str]],
+    fret_nodes: list[FRETNode],
+    selection: ListStore[str] | list[str] | None = None,
+    file_selection: dict[uuid.UUID, ListStore[str]] | None = None,
 ):
     settings_dialog = solara.use_reactive(False)
     file_filter_dialog = solara.use_reactive(False)
@@ -619,13 +620,16 @@ def BurstFigure(
         BurstPlotSettings()
     )  # -> these reset to default, move to global state?
 
+    selection = use_liststore(selection if selection is not None else [])
+    file_selection = {} if file_selection is None else file_selection
+
     dark_effective = solara.lab.use_dark_effective()
 
     labels = ["Measurement", "Bursts"]  # TODO move elsewhere
-    selector_nodes = make_selector_nodes(state.fret_nodes.items, "bursts")
+    selector_nodes = make_selector_nodes(fret_nodes, "bursts")
     # making the levels populates the selection
     levels = list(NestedSelectors(nodes=selector_nodes, selection=selection, labels=labels))
-    burst_node = get_bursts(state.fret_nodes.items, selection.items)
+    burst_node = get_bursts(fret_nodes, selection.items)
     filenames = sorted(burst_node.df["filename"].unique())
     if burst_node.id in file_selection:
         file_store = file_selection[burst_node.id]

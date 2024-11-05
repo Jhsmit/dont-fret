@@ -29,10 +29,12 @@ def BurstPage():
 
     with solara.GridFixed(columns=2):
         BurstFigure(
+            state.fret_nodes,
             state.burst_figure_selection[0],
             state.burst_figure_file_selection[0],
         )
         BurstFigure(
+            state.fret_nodes,
             state.burst_figure_selection[1],
             state.burst_figure_file_selection[1],
         )

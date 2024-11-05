@@ -118,11 +118,18 @@ class ListStore(Generic[T]):
         return self._items.subscribe_change(listener, scope=scope)
 
 
-def use_liststore(initial_value: list[T]) -> ListStore[T]:
+def use_liststore(value: list[T] | ListStore[T]) -> ListStore[T]:
+    """use_reactive for liststore"""
+
     def make_liststore():
-        return ListStore(initial_value)
+        if not isinstance(value, ListStore):
+            return ListStore(value)
 
     store = solara.use_memo(make_liststore, [])
+    if isinstance(value, ListStore):
+        store = value
+    assert store is not None
+
     return store
 
 
