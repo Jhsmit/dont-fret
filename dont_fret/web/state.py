@@ -5,8 +5,8 @@ import solara
 
 from dont_fret.config import cfg
 from dont_fret.web.datamanager import ThreadedDataManager
-from dont_fret.web.models import BurstColorList, FRETStore, ListStore
-from dont_fret.web.reactive import BurstSettingsReactive, SnackbarReactive
+from dont_fret.web.models import BurstColorList, FRETStore, ListStore, Snackbar
+from dont_fret.web.reactive import BurstSettingsReactive
 
 APP_TITLE = "Don't FRET!"
 
@@ -18,7 +18,7 @@ burst_settings = BurstSettingsReactive(
 )
 
 filters = ListStore(copy.deepcopy(cfg.web.burst_filters))
-snackbar = SnackbarReactive()
+snackbar = Snackbar()
 
 fret_nodes = FRETStore([])
 

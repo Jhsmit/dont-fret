@@ -207,6 +207,38 @@ class SnackbarMessage:
     show: bool = False
 
 
+class Snackbar:
+    def __init__(self, value: SnackbarMessage = SnackbarMessage(), default_timeout: int = 5000):
+        self.default_timeout = default_timeout
+        self.message = solara.Reactive(value)
+
+    @property
+    def value(self) -> SnackbarMessage:
+        return self.message.value
+
+    def update(self, **kwargs):
+        self.message.update(**kwargs)
+
+    def set_message(self, msg: str, timeout: Optional[int] = None, **kwargs):
+        timeout = timeout if timeout is not None else self.default_timeout
+        self.message.update(message=msg, timeout=timeout, show=True, **kwargs)
+
+    def info(self, msg: str, timeout: Optional[int] = None):
+        self.set_message(msg, color="primary", btn_color="text-primary-color", timeout=timeout)
+
+    def secondary(self, msg: str, timeout: Optional[int] = None):
+        self.set_message(msg, color="secondary", btn_color="text-secondary-color", timeout=timeout)
+
+    def warning(self, msg: str, timeout: Optional[int] = None):
+        self.set_message(msg, color="warning", btn_color="text-warning-color", timeout=timeout)
+
+    def error(self, msg: str, timeout: Optional[int] = None):
+        self.set_message(msg, color="error", btn_color="text-error-color", timeout=timeout)
+
+    def success(self, msg: str, timeout: Optional[int] = None):
+        self.set_message(msg, color="success", btn_color="text-success-color", timeout=timeout)
+
+
 class _NoDefault:
     """Sentinel class to distinguish between no default and None as default"""
 
