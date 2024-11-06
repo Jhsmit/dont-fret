@@ -143,5 +143,5 @@ def TCSPCFigure(photon_node: PhotonNode):
 
         return fig
 
-    figure_task = solara.lab.use_task(redraw, dependencies=[photon_node, settings, dark_effective])  # type: ignore
+    figure_task = solara.lab.use_task(redraw, dependencies=[photon_node, settings, dark_effective])  # type: ignore  # noqa: SH101
     FigureFromTask(figure_task)
