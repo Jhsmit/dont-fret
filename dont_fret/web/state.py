@@ -20,10 +20,7 @@ burst_settings = BurstSettingsReactive(
 filters = ListStore(copy.deepcopy(cfg.web.burst_filters))
 snackbar = SnackbarReactive()
 
-from dont_fret.web.tmp_load import TEST_NODES
-
-fret_nodes = FRETStore(TEST_NODES)
-# fret_nodes = FRETStore([])
+fret_nodes = FRETStore([])
 
 burst_figure_selection = [
     ListStore[str](),
