@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
+import warnings
 from collections import UserList
 from dataclasses import dataclass, field, make_dataclass, replace
 from pathlib import Path
@@ -358,9 +359,12 @@ def use_liststore(value: list[T] | ListStore[T]) -> ListStore[T]:
         if not isinstance(value, ListStore):
             return ListStore(value)
 
-    store = solara.use_memo(make_liststore, [value])  # type ignore
+    # dependencies = [value] if not isinstance(value, ListStore) else []
+
+    store = solara.use_memo(make_liststore, value)  # type ignore
     if isinstance(value, ListStore):
-        raise ValueError("look at use_reactive to implement all cases properly")
+        warnings.warn("look at use_reactive to implement all cases properly")
+        # raise ValueError("look at use_reactive to implement all cases properly")
         store = value
     assert store is not None
 
