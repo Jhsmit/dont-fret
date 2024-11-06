@@ -38,23 +38,18 @@ class ThreadedDataManager:
         return self.loop.run_in_executor(self.executor, func, *args)
 
     async def get_photons(self, node: PhotonNode) -> PhotonData:
-        # Check if we have a future in the cache
         if node.id not in self.photon_cache:
-            # Create a future for this job
             future = self.loop.create_future()
             self.photon_cache[node.id] = future
 
             try:
-                # Run the actual data loading in a thread
                 photons = await self.run(PhotonData.from_file, PhotonFile(node.file_path))
                 future.set_result(photons)
             except Exception as e:
-                # If there's an error, remove the future from cache and propagate the error
                 self.photon_cache.pop(node.id)
                 future.set_exception(e)
                 raise
 
-        # Wait for and return the result
         return await self.photon_cache[node.id]
 
     async def get_info(self, node: PhotonNode) -> dict:
