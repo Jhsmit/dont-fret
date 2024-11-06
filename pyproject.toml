@@ -58,7 +58,7 @@ test = [
     "pytest>=7.2.0",
     "pytest-playwright>=0.3.3",
     "pytest-asyncio",
-    "pytest-ipywidgets[solara],"
+    "pytest-ipywidgets[solara]",
 ]
 
 
