@@ -437,7 +437,7 @@ class FRETStore(ListStore[FRETNode]):
         node = FRETNode(name=solara.Reactive(name))
         self.append(node)
 
-    def get_node(self, node_id: str) -> FRETNode:
+    def get_node(self, node_id: uuid.UUID) -> FRETNode:
         for node in self.items:
             if node.id == node_id:
                 return node
