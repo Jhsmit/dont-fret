@@ -28,6 +28,7 @@ class BurstFilterItem:
     name: str
     min: Optional[float] = field(default=None)
     max: Optional[float] = field(default=None)
+    active: bool = field(default=True)
 
     def as_expr(self) -> list[pl.Expr]:
         expr = []

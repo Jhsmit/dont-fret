@@ -41,7 +41,7 @@ def search_and_save(
 
 
 def write_dataframe(df: pl.DataFrame, path: Path) -> None:
-    """Write a dataframe to disk. Writier used depends on path suffix."""
+    """Write a dataframe to disk. Writer used depends on path suffix."""
     if path.suffix == ".pq":
         df.write_parquet(path)
     elif path.suffix == ".csv":

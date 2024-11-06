@@ -1,4 +1,7 @@
-from typing import cast
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Literal, Optional, cast
 
 import solara
 import solara.lab
@@ -9,10 +12,12 @@ from dont_fret.web.home.info_cards import (
     BurstInfoCard,
     BurstItemInfoCard,
     FRETNodeInfoCard,
-    PhotonFileInfoCard,
     PhotonInfoCard,
+    PhotonNodeInfoCard,
 )
 from dont_fret.web.methods import to_treeview
+from dont_fret.web.models import BurstNode, FRETNode, PhotonNode
+from dont_fret.web.utils import has_bursts, has_photons
 
 welcome_text = """# Don't FRET!
 
@@ -35,16 +40,65 @@ open_ = solara.Reactive(cast(list[str], []))
 active_id = solara.Reactive(cast(list[str], []))
 
 
-@solara.component
+# TODO there are now 3 selection classes
+# perhaps they can be generalized
+@dataclass
+class TreeSelection:
+    f_idx: Optional[int] = None
+    node_type: Literal["bursts", "photons", None] = None
+    d_idx: Optional[int] = None
+
+    @classmethod
+    def from_string(cls, input_string: str) -> TreeSelection:
+        parts = input_string.split(":")
+
+        def parse_node_type(nt: str) -> Literal["bursts", "photons", None]:
+            if nt in ("bursts", "photons"):
+                return nt
+            elif nt.lower() == "none":
+                return None
+            else:
+                raise ValueError(f"Invalid node_type: {nt}. Must be 'bursts', 'photons', or None.")
+
+        if not input_string:
+            return cls()
+        elif len(parts) == 1:
+            return cls(f_idx=int(parts[0]))
+        elif len(parts) == 2:
+            f_idx, node_type = parts
+            return cls(f_idx=int(f_idx), node_type=parse_node_type(node_type))
+        elif len(parts) == 3:
+            f_idx, node_type, d_idx = parts
+            return cls(f_idx=int(f_idx), node_type=parse_node_type(node_type), d_idx=int(d_idx))
+        else:
+            raise ValueError("Invalid input string format")
+
+    @property
+    def fret_node(self) -> FRETNode:
+        assert self.f_idx is not None
+        return state.fret_nodes.items[self.f_idx]
+
+    @property
+    def data_node(self) -> PhotonNode | BurstNode:
+        assert self.d_idx is not None
+        if self.node_type == "photons":
+            return self.fret_node.photons.items[self.d_idx]
+        elif self.node_type == "bursts":
+            return self.fret_node.bursts.items[self.d_idx]
+        else:
+            raise ValueError(f"Invalid node_type: {self.node_type}")
+
+
+@solara.component  # type: ignore
 def HomePage():
-    if len(state.fret_nodes.value) == 0:
-        state.fret_nodes.add_node()
+    if len(state.fret_nodes) == 0:
+        state.fret_nodes.new_node()
 
     with solara.Columns([4, 8], style={"height": "100%"}):
         with solara.Card("FRET Measurements"):
             with solara.Column():
                 FRETTreeView(
-                    items=to_treeview(state.fret_nodes.value),
+                    items=to_treeview(state.fret_nodes.items),
                     active=active_id.value,
                     on_active=active_id.set,  # type: ignore
                     open_=open_.value,
@@ -57,63 +111,64 @@ def HomePage():
                 solara.Button(
                     "Add new measurement",
                     text=True,
-                    on_click=lambda *args: state.fret_nodes.add_node(),
+                    on_click=lambda *args: state.fret_nodes.new_node(),
                 )
 
-        split = active_id.value[0].split(":") if active_id.value else []
-        if len(split) == 0:
-            with solara.Card():
-                solara.Markdown(welcome_text, style="font-size: 18px")
-        elif len(split) == 1:
+        selection = TreeSelection.from_string(active_id.value[0] if active_id.value else "")
+        # TODO this selection suses indices while later we use uuid's
+        match selection:
+            case TreeSelection(f_idx=None, node_type=None, d_idx=None):
+                with solara.Card():
+                    solara.Markdown(welcome_text, style="font-size: 18px")
+            case TreeSelection(f_idx=int(), node_type=None, d_idx=None):
+                node = selection.fret_node
 
-            def on_delete_node(node_id=split[0]):
-                # set the active id to the parent node before deleting
-                active_id.set([])
-                state.fret_nodes.remove_node(node_id)
+                def on_delete(idx=selection.f_idx):
+                    # set the active id to the parent node before deleting
+                    active_id.set([])
+                    state.fret_nodes.pop(idx)  # type: ignore
 
-            def on_name(value: str, node_id=split[0]):
-                idx = state.fret_nodes.node_idx(node_id)
-                ref = solara.toestand.Ref(state.fret_nodes.fields[idx])
-                ref.update(name=value)
-
-            def on_description(value: str, node_id=split[0]):
-                idx = state.fret_nodes.node_idx(node_id)
-                ref = solara.toestand.Ref(state.fret_nodes.fields[idx])
-                ref.update(description=value)
-
-            fret_node = state.fret_nodes.get_node(split[0])
-            FRETNodeInfoCard(
-                fret_node, on_name=on_name, on_description=on_description, on_delete=on_delete_node
-            )
-        elif len(split) == 2:
-            node_id, dtype = split
-            if dtype == "photons":
+                FRETNodeInfoCard(name=node.name, description=node.description, on_delete=on_delete)
+            case TreeSelection(f_idx=int(), node_type="photons", d_idx=None):
+                # TODO open_ callable
                 PhotonInfoCard(
-                    state.fret_nodes, node_id, state.filebrowser_folder, state.burst_settings, open_
+                    selection.fret_node.name.value,
+                    selection.fret_node.photons,
+                    selection.fret_node.bursts,
+                    state.filebrowser_folder,
+                    state.burst_settings,
                 )
-            elif dtype == "bursts":
-                BurstInfoCard(state.fret_nodes, node_id, state.filebrowser_folder, open_)
-        elif len(split) == 3:
-            node_id, dtype, file_item_id = split
-            fret_node = state.fret_nodes.get_node(node_id)
+            case TreeSelection(f_idx=int(), node_type="bursts", d_idx=None):
+                # TODO open_
+                BurstInfoCard(
+                    selection.fret_node.name.value,
+                    selection.fret_node.bursts,
+                    state.filebrowser_folder,
+                    # open_
+                )
+            case TreeSelection(f_idx=int(), node_type="photons", d_idx=int()):
+                photon_node = selection.data_node
+                assert isinstance(photon_node, PhotonNode)
+                fret_node = selection.fret_node
 
-            if dtype not in ["photons", "bursts"]:
-                raise ValueError(f"Invalid dtype {dtype}")
-
-            item = state.fret_nodes.get_item(node_id, dtype, file_item_id)  # type: ignore
-            if dtype == "photons":
-
-                def on_delete(item_id=file_item_id):
+                def delete_photon(p_node_idx=selection.d_idx):
                     # set the active id to the parent node before deleting
-                    active_id.set([f"{node_id}:{dtype}"])
-                    state.fret_nodes.remove_item(node_id, "photons", item_id)
+                    active_id.set([f"{selection.f_idx}:{selection.node_type}"])
+                    fret_node.photons.pop(p_node_idx)  # type: ignore
+                    state.disable_trace_page.set(not has_photons(state.fret_nodes.items))
 
-                PhotonFileInfoCard(item, fret_node.name, on_delete)
-            elif dtype == "bursts":
+                PhotonNodeInfoCard(fret_node.name.value, photon_node, delete_photon)
 
-                def on_delete(item_id=file_item_id):
+            case TreeSelection(f_idx=int(), node_type="bursts", d_idx=int()):
+                burst_node = selection.data_node
+                assert isinstance(burst_node, BurstNode)
+
+                fret_node = selection.fret_node
+
+                def delete_burst(b_node_idx=selection.d_idx):
                     # set the active id to the parent node before deleting
-                    active_id.set([f"{node_id}:{dtype}"])
-                    state.fret_nodes.remove_item(node_id, "bursts", item_id)
+                    active_id.set([f"{selection.f_idx}:{selection.node_type}"])
+                    fret_node.bursts.pop(b_node_idx)  # type: ignore
+                    state.disable_burst_page.set(not has_bursts(state.fret_nodes.items))
 
-                BurstItemInfoCard(item, fret_node.name, on_delete)
+                BurstItemInfoCard(fret_node.name.value, burst_node, delete_burst)

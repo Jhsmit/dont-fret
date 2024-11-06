@@ -3,6 +3,7 @@ import copy
 import sys
 from pathlib import Path
 
+import altair as alt
 import solara
 import solara.lab
 import solara.server.settings
@@ -13,41 +14,12 @@ from dont_fret.config import cfg
 from dont_fret.web.bursts import BurstPage
 from dont_fret.web.components import Snackbar
 from dont_fret.web.home import HomePage
-from dont_fret.web.models import BurstColorList, FRETNode
+from dont_fret.web.models import BurstColorList
+from dont_fret.web.state import disable_burst_page, disable_trace_page
 from dont_fret.web.trace import TracePage
 
-
-def disable_bursts(nodes: list[FRETNode]) -> bool:
-    return not bool([ph for node in nodes for ph in node.bursts])
-
-
-def disable_trace(nodes: list[FRETNode]) -> bool:
-    return not bool([b for node in nodes for b in node.photons])
-
-
-pages = [
-    {
-        "name": "home",
-        "main": HomePage,
-        "sidebar": None,
-        "disabled": lambda x: False,
-        "show": lambda: True,
-    },
-    {
-        "name": "bursts",
-        "main": BurstPage,
-        "sidebar": None,
-        "disabled": disable_bursts,
-        "show": lambda: True,
-    },
-    {
-        "name": "trace",
-        "main": TracePage,
-        "sidebar": None,
-        "disabled": disable_trace,
-        "show": lambda: True,
-    },
-]
+# config option?
+alt.data_transformers.enable("vegafusion")
 
 
 parser = argparse.ArgumentParser(description="Process config argument")
@@ -61,6 +33,32 @@ if "--" in sys.argv:
     cfg.update(data)
 
 
+SCRIPT_PATH = Path(__file__).parent
+PAGES = [
+    {
+        "name": "home",
+        "main": HomePage,
+        "sidebar": None,
+        "disabled": solara.Reactive(False),  # always false
+        "show": lambda: True,
+    },
+    {
+        "name": "bursts",
+        "main": BurstPage,
+        "sidebar": None,
+        "disabled": disable_burst_page,
+        "show": lambda: True,
+    },
+    {
+        "name": "trace",
+        "main": TracePage,
+        "sidebar": None,
+        "disabled": disable_trace_page,
+        "show": lambda: True,
+    },
+]
+
+
 @solara.component
 def Page():
     tab_selection = solara.use_reactive(0)
@@ -68,8 +66,11 @@ def Page():
     login_failed = solara.use_reactive(False)
     password = solara.use_reactive("")
 
+    solara.Style(SCRIPT_PATH / "style.css")
+
     def initialize():
-        state.burst_settings.set({k: BurstColorList(v) for k, v in cfg.burst_search.items()})
+        # TODO burst settings as listStore
+        state.burst_settings.set({k: BurstColorList(v) for k, v in cfg.burst_search.items()})  # type: ignore
 
         default_filters = copy.deepcopy(cfg.web.burst_filters)
         state.filters.set(default_filters)
@@ -91,6 +92,8 @@ def Page():
         else:
             login_failed.set(True)
 
+    # has_photons = [node for node in state.fr--
+
     # it is important we do not interrupt the height 100% chain
     # to ensure independent scrolling for both columns
     with solara.Column(style={"height": "100%"}):
@@ -100,16 +103,14 @@ def Page():
             with solara.lab.Tabs(
                 value=tab_selection.value, on_value=tab_selection.set, align="center"
             ):
-                for page in pages:
+                for page in PAGES:
                     if page["show"]():
-                        solara.lab.Tab(
-                            page["name"], disabled=page["disabled"](state.fret_nodes.value)
-                        )
+                        solara.lab.Tab(page["name"], disabled=page["disabled"].value)
         solara.Title(state.APP_TITLE)
 
         if authorized.value:
-            pages[tab_selection.value]["main"]()
-            sidebar = pages[tab_selection.value]["sidebar"]
+            PAGES[tab_selection.value]["main"]()
+            sidebar = PAGES[tab_selection.value]["sidebar"]
             if sidebar is not None:
                 sidebar()
         else:

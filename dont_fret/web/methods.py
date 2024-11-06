@@ -2,96 +2,61 @@ from __future__ import annotations
 
 import itertools
 import math
-from concurrent.futures import ThreadPoolExecutor
 from functools import reduce
 from operator import and_
-from pathlib import Path
 from typing import Literal, Optional, TypedDict, Union
 
+import numpy as np
 import polars as pl
 
-from dont_fret import BinnedPhotonData
 from dont_fret.config.config import BurstColor
-from dont_fret.formatting import TRACE_COLORS
-from dont_fret.web.models import (
-    BurstFilterItem,
-    BurstItem,
-    FRETNode,
-    PhotonData,
-    PhotonFileItem,
-    TraceSettings,
-)
+from dont_fret.fileIO import PhotonFile
+from dont_fret.models import Bursts, PhotonData
+from dont_fret.web.models import BurstFilterItem, BurstNode, FRETNode, PhotonNode
 
 
-def batch_burst_search(
-    photon_file_items: list[PhotonFileItem], burst_colors: str, max_workers: int = 4
-) -> BurstItem:
-    """
-    Search all photon file items in batch threaded.
-    """
-    dtype = pl.Enum([item.name for item in photon_file_items])
-
-    futures = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for f in photon_file_items:
-            fut = executor.submit(burst_search, f, burst_colors, dtype)
-            futures.append(fut)
-
-    df = pl.concat([f.result() for f in futures], how="vertical_relaxed")
-    metadata = {fi.name: fi.get_info() for fi in photon_file_items}
-
-    return BurstItem(name=burst_colors, df=df, metadata=metadata)
-
-
-def burst_search(
-    ph_file_item: PhotonFileItem, burst_colors: str | list[BurstColor], dtype: pl.Enum
+def make_burst_dataframe(
+    bursts: list[Bursts], names: Optional[list[str]], name_column="filename"
 ) -> pl.DataFrame:
-    photons = ph_file_item.get_photons()
-    bursts = photons.burst_search(burst_colors)
+    """Convert a list of `Bursts` objects into a `polars.DataFrame`."""
 
-    t_unit = photons.timestamps_unit
-    with_columns = [
-        # (pl.col("timestamps_mean") * t_unit).alias("time_mean"),
-        # ((pl.col("timestamps_max") - pl.col("timestamps_min")) * t_unit).alias("time_length"),
-        pl.lit(ph_file_item.name).alias("filename").cast(dtype),
-    ]
+    concat = pl.concat([b.burst_data for b in bursts], how="vertical_relaxed")
+    if names:
+        lens = [len(burst) for burst in bursts]
+        dtype = pl.Enum(categories=names)
+        series = pl.Series(name=name_column, values=np.repeat(names, lens), dtype=dtype)
 
-    drop_columns = ["timestamps_mean", "timestamps_min", "timestamps_max"]
-    df = bursts.burst_data.with_columns(with_columns).drop(drop_columns)
+        return concat.with_columns(series)
+    else:
+        return concat
 
-    return df
+
+def make_burst_nodes(
+    photon_nodes: list[PhotonNode], burst_settings: dict[str, list[BurstColor]]
+) -> list[BurstNode]:
+    photons = [PhotonData.from_file(PhotonFile(node.file_path)) for node in photon_nodes]
+    burst_nodes = []
+    # todo tqdm?
+    for name, burst_colors in burst_settings.items():
+        bursts = [photons.burst_search(burst_colors) for photons in photons]
+        infos = [get_info(photons) for photons in photons]
+        duration = get_duration(infos)
+        df = make_burst_dataframe(bursts, names=[node.name for node in photon_nodes])
+        node = BurstNode(
+            name=name, df=df, colors=burst_colors, photon_nodes=photon_nodes, duration=duration
+        )
+        burst_nodes.append(node)
+
+    return burst_nodes
 
 
 def chain_filters(filters: list[BurstFilterItem]) -> Union[pl.Expr, Literal[True]]:
     """Chain a list of `BurstFilterItem` objects into a single `pl.Expr` object."""
-    f_exprs = list(itertools.chain(*(f.as_expr() for f in filters)))
+    f_exprs = list(itertools.chain(*(f.as_expr() for f in filters if f.active)))
     if f_exprs:
         return reduce(and_, f_exprs)
     else:
         return True
-
-
-# todo move to `dev`
-def create_file_items(pth: Path) -> list[PhotonFileItem]:
-    """Return a list of `PhotonFileItem` objects from a directory containing ptu files."""
-    return [PhotonFileItem(file_path=ptu_pth) for ptu_pth in pth.glob("*.ptu")]
-
-
-# move to `dev` ?
-def gen_fileitems(n: Optional[int] = None, directory: str = "ds2") -> list[PhotonFileItem]:
-    """Returns a list of the first `n` FileItem objects generated from
-    the data in `TEST_FILE_DIR`"""
-
-    # root = Path(__file__).parent.parent.parent.parent
-    root = Path(*Path(__file__).parts[:5])
-
-    test_dir = root / "tests" / "test_data" / "input" / directory
-
-    file_items = create_file_items(test_dir)
-    if n is None:
-        return file_items
-    else:
-        return file_items[:n]
 
 
 def get_duration(metadata: list[dict]) -> Optional[float]:
@@ -99,11 +64,12 @@ def get_duration(metadata: list[dict]) -> Optional[float]:
     are all equal, otherwise returns `None`
     """
 
-    durations = [m.get("acquisition_duration", None) for m in metadata]
-    if len(set(durations)) == 1:
-        return durations[0]
-    else:
+    durations = {m.get("acquisition_duration", None) for m in metadata}
+    if None in durations:
         return None
+    elif len(durations) != 1:
+        return None
+    return durations.pop()
 
 
 def format_size(size_in_bytes: int) -> str:
@@ -122,57 +88,38 @@ class BurstResult(TypedDict):
     metadata: dict
 
 
-def generate_traces(
-    photons: PhotonData, trace_settings: TraceSettings
-) -> dict[str, BinnedPhotonData]:
-    t_bin = trace_settings.t_bin * 1e-3
-    bounds = (trace_settings.t_min, trace_settings.t_max)
-
-    traces = {}
-    for stream in TRACE_COLORS:
-        stream_data = PhotonData(
-            photons.data.filter(pl.col("stream") == stream),
-            metadata=photons.metadata,
-            cfg=photons.cfg,
-        )
-
-        traces[stream] = BinnedPhotonData(stream_data, binning_time=t_bin, bounds=bounds)
-
-    return traces
-
-
 def to_treeview(nodes: list[FRETNode]) -> list[dict]:
     items = []
-    for fret_node in nodes:
+    for node_idx, fret_node in enumerate(nodes):
         item = {
-            "name": fret_node.name,
-            "id": fret_node.id,
+            "name": fret_node.name.value,
+            "id": str(node_idx),
             "icon": "mdi-ruler",
             "children": [
                 {
                     "name": "Photons",
-                    "id": f"{fret_node.id}:photons",
+                    "id": f"{node_idx}:photons",
                     "icon": "mdi-lightbulb",
                     "children": [
                         {
                             "name": photon_file.name,
-                            "id": f"{fret_node.id}:photons:{photon_file.name}",
+                            "id": f"{node_idx}:photons:{ph_idx}",
                             "icon": "mdi-file-star",
                         }
-                        for photon_file in fret_node.photons
+                        for ph_idx, photon_file in enumerate(fret_node.photons.items)
                     ],
                 },
                 {
                     "name": "Bursts",
-                    "id": f"{fret_node.id}:bursts",
+                    "id": f"{node_idx}:bursts",
                     "icon": "mdi-flash",
                     "children": [
                         {
                             "name": burst_item.name,
-                            "id": f"{fret_node.id}:bursts:{burst_item.name}",
+                            "id": f"{node_idx}:bursts:{b_idx}",
                             "icon": "mdi-file-chart",
                         }
-                        for burst_item in fret_node.bursts
+                        for b_idx, burst_item in enumerate(fret_node.bursts.items)
                     ],
                 },
             ],
@@ -180,3 +127,20 @@ def to_treeview(nodes: list[FRETNode]) -> list[dict]:
 
         items.append(item)
     return items
+
+
+def get_info(photons: PhotonData) -> dict:
+    info = {}
+    info["creation_time"] = photons.metadata["creation_time"]
+    info["number_of_photons"] = len(photons)
+    info["acquisition_duration"] = photons.metadata["acquisition_duration"]
+    info["power_diode"] = photons.metadata["tags"]["UsrPowerDiode"]["value"]
+
+    info["cps"] = photons.cps
+    t_max = photons.photon_times.max()
+    counts = photons.data["stream"].value_counts(sort=True)
+    info["stream_cps"] = {k: v / t_max for k, v in counts.iter_rows()}
+
+    if comment := photons.comment:
+        info["comment"] = comment
+    return info

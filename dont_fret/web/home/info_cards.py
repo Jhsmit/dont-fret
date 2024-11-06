@@ -1,5 +1,6 @@
 """Solara components for the home page."""
 
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -11,52 +12,46 @@ import yaml
 from solara.alias import rv
 
 import dont_fret.web.state as state
+from dont_fret.config.config import BurstColor
+from dont_fret.web.components import EditableTitle
 from dont_fret.web.home.burst_settings import BurstSettingsDialog
 from dont_fret.web.home.methods import task_burst_search
 from dont_fret.web.methods import format_size
-from dont_fret.web.models import BurstItem, FRETNode, PhotonFileItem
-from dont_fret.web.reactive import (
-    BurstSettingsReactive,
-    ReactiveFRETNodes,
+from dont_fret.web.models import (
+    BurstNode,
+    BurstSettingsStore,
+    ListStore,
+    PhotonNode,
 )
+from dont_fret.web.utils import has_photons
 
 
 @solara.component
 def FRETNodeInfoCard(
-    fret_node: FRETNode,
-    on_name: Callable[[str], None],
-    on_description: Callable[[str], None],
+    name: solara.Reactive[str],
+    description: solara.Reactive[str],
     on_delete: Callable[[], None],
 ):
-    title = solara.use_reactive(fret_node.name)
-    editing, set_editing = solara.use_state(False)
+    edit = solara.use_reactive(False)
 
-    def update_title(value):
-        title.set(value)
-        on_name(value)
-        set_editing(False)
-
-    title_elem = (
-        fret_node.name
-        if not editing
-        else solara.InputText(label="", value=title, on_value=update_title, continuous_update=False)
-    )
-    with solara.Card(title_elem):  # type: ignore
-        rv.Textarea(label="Description", v_model=fret_node.description, on_v_model=on_description)
+    with solara.Card(EditableTitle(name, edit)):  # type: ignore
+        rv.Textarea(label="Description", v_model=description.value, on_v_model=description.set)
         with solara.CardActions():
             rv.Spacer()
-            solara.IconButton("edit", on_click=lambda: set_editing(True))
+            solara.IconButton("edit", on_click=lambda: edit.set(not edit.value))
             solara.IconButton("delete", on_click=lambda *args: on_delete())
 
 
 @solara.component
 def PhotonInfoCard(
-    fret_nodes: ReactiveFRETNodes,
-    measurement_id: str,
+    name: str,
+    photon_store: ListStore[PhotonNode],
+    burst_store: ListStore[BurstNode],
     filebrowser_folder: solara.Reactive[Path],
-    burst_settings: BurstSettingsReactive,
-    open_: solara.Reactive[list[str]],
+    burst_settings: BurstSettingsStore,
+    # open_: solara.Reactive[list[str]],
 ):
+    # todo reactives
     bs_name, set_bs_name = solara.use_state(next(iter(burst_settings.value.keys())))
     add_new, set_add_new = solara.use_state(False)
     show_settings_dialog, set_show_settings_dialog = solara.use_state(False)
@@ -65,12 +60,14 @@ def PhotonInfoCard(
 
     # open the current node so that users can see the files they're adding
     def open_node():
-        ph_node_id = f"{measurement_id}:photons"
+        # Todo attach to callable
+        pass
+        # ph_node_id = f"{node_idx}:photons"
 
-        if ph_node_id not in open_.value:
-            new_open = open_.value.copy()
-            new_open.append(ph_node_id)
-            open_.value = new_open
+        # if ph_node_id not in open_.value:
+        #     new_open = open_.value.copy()
+        #     new_open.append(ph_node_id)
+        #     open_.value = new_open
 
     def filebrowser_filter(pth: Path) -> bool:
         """Return True if the path is a ptu file or a folder."""
@@ -96,31 +93,45 @@ def PhotonInfoCard(
 
     def add_files(files: list[Path]):
         open_node()
-        current_names = [ph.name for ph in fret_nodes.get_node(measurement_id).photons]
-        to_add = [PhotonFileItem(file_path=pth) for pth in files if pth.name not in current_names]
-        fret_nodes.add_photon_files(measurement_id, to_add)
+        current_names = [ph.name for ph in photon_store.items]
+        to_add = [PhotonNode(file_path=pth) for pth in files if pth.name not in current_names]
+        # TODO sort ?
+
+        photon_store.extend(to_add)
+        state.disable_trace_page.set(not has_photons(state.fret_nodes.items))
 
     def remove_all_files(*ignore):
-        fret_nodes.remove_all_photon_files(measurement_id)
+        photon_store.set([])
+        state.disable_trace_page.set(not has_photons(state.fret_nodes.items))
 
     def confirm_burst_search():
-        if not state.fret_nodes.get_node(measurement_id).photons:
+        # TODO needs to be passed as callable as well
+
+        if not photon_store.items:
             state.snackbar.warning("No photon files selected", timeout=0)
             return
-        if bs_name in [b.name for b in fret_node.bursts]:
+        if bs_name in {node.name for node in burst_store.items}:
             open_confirmation_dialog.value = True
         else:
             do_burst_search()
 
     def do_burst_search():
         # open the bursts node if not open already
-        bursts_node_id = f"{measurement_id}:bursts:"
-        if bursts_node_id not in open_.value:
-            new_open = open_.value.copy()
-            new_open.append(bursts_node_id)
-            open_.value = new_open
+        # bursts_node_id = f"{measurement_id}:bursts:"
+        # if bursts_node_id not in open_.value:
+        #     new_open = open_.value.copy()
+        #     new_open.append(bursts_node_id)
+        #     open_.value = new_open
 
-        task_burst_search(bs_name, measurement_id)
+        # remove the burst node if its already in the store
+        try:
+            names = [node.name for node in burst_store.items]
+            idx = names.index(bs_name)
+            burst_store.pop(idx)
+        except ValueError:
+            pass
+
+        task_burst_search(bs_name, photon_store.items, burst_store)
 
     def on_new_settings(new_name):
         if new_name in burst_settings.settings_names:
@@ -129,8 +140,7 @@ def PhotonInfoCard(
         burst_settings.add_settings(new_name)
         set_bs_name(new_name)
 
-    fret_node = fret_nodes.get_node(measurement_id)
-    with solara.Card(f"{fret_node.name} / Photons"):
+    with solara.Card(f"{name} / Photons"):
         with solara.Columns([3, 1], gutters=False, gutters_dense=True):
             with solara.Card(margin=0):
                 solara.Text("Click files to add")
@@ -142,6 +152,7 @@ def PhotonInfoCard(
                 )
 
             with solara.Card("Burst Search", margin=0):
+                # TODO the settings need to move to a component
                 with solara.Column():
                     if add_new:
                         solara.InputText(
@@ -220,15 +231,21 @@ def PhotonInfoCard(
         persistent=False,
         max_width=800,
     ):
-        BurstSettingsDialog(burst_settings, bs_name, on_close=set_show_settings_dialog)
+
+        def on_value(value: list[BurstColor], name=bs_name):
+            burst_settings[name] = value
+
+        BurstSettingsDialog(
+            burst_settings[bs_name], bs_name, on_value=on_value, on_close=set_show_settings_dialog
+        )
 
 
-@solara.component
+@solara.component  # type: ignore
 def BurstInfoCard(
-    fret_nodes: ReactiveFRETNodes,
-    measurement_id: str,
+    name: str,
+    burst_store: ListStore[BurstNode],
     filebrowser_folder: solara.Reactive[Path],
-    open_: solara.Reactive[list[str]],
+    # open_: solara.Reactive[list[str]],
 ):
     # TODO different file types for bursts
     def filebrowser_filter(pth: Path) -> bool:
@@ -244,24 +261,23 @@ def BurstInfoCard(
         if burst_pth.is_dir():
             return
 
-        bursts_node_id = f"{measurement_id}:bursts"
-
+        state.snackbar.warning("Not implemented")
         # open the leaf we are adding to
-        if bursts_node_id not in open_.value:
-            new_open = open_.value.copy()
-            new_open.append(bursts_node_id)
-            open_.value = new_open
+        # if bursts_node_id not in open_.value:
+        #     new_open = open_.value.copy()
+        #     new_open.append(bursts_node_id)
+        #     open_.value = new_open
 
         # check if the item already exists:
-        if burst_pth.stem in [b.name for b in fret_nodes.get_node(measurement_id).bursts]:
+        if burst_pth.stem in [b.name for b in burst_store.items]:
             state.snackbar.warning(f"Burst result name {burst_pth.stem!r} already exists.")
             return
 
-        # TODO check already added
-        fret_nodes.add_burst_items(measurement_id, [BurstItem.from_path(burst_pth)])
+        # TODO via dataloader object
+        raise NotImplementedError("TODO via dataloader object")
+        # burst_store.extend([BurstNode.from_path(burst_pth)])
 
-    fret_node = fret_nodes.get_node(measurement_id)
-    with solara.Card(f"{fret_node.name} / Bursts"):
+    with solara.Card(f"{name} / Bursts"):
         solara.Text("Click files to add")
         solara.FileBrowser(
             directory=filebrowser_folder.value,
@@ -273,22 +289,22 @@ def BurstInfoCard(
 
 
 @solara.component
-def PhotonFileInfoCard(ph_file_item: PhotonFileItem, node_name: str, on_delete: Callable[[], None]):
+def PhotonNodeInfoCard(node_name: str, photon_node: PhotonNode, on_delete: Callable[[], None]):
     # prevent flicker by setting `loaded` to `True` if we find ourselves in this component
     # with the photon loading future already completed
     loaded, set_loaded = solara.use_state(False)
 
-    def load_info():
-        if ph_file_item.photons is not None:
+    async def load_info():
+        if photon_node.id in state.data_manager.photon_cache:
             set_loaded(True)
         else:
             set_loaded(False)
-        info = ph_file_item.get_info()
+        info = await state.data_manager.get_info(photon_node)
         return info
 
-    result = solara.lab.use_task(load_info, dependencies=[ph_file_item], prefer_threaded=True)
+    result = solara.lab.use_task(load_info, dependencies=[photon_node], prefer_threaded=False)  # type: ignore
 
-    with solara.Card(f"{node_name} / Photon file / {ph_file_item.name}"):
+    with solara.Card(f"{node_name} / Photon file / {photon_node.name}"):
         solara.ProgressLinear(result.pending and not loaded)
 
         if result.pending and not loaded:
@@ -317,7 +333,7 @@ def PhotonFileInfoCard(ph_file_item: PhotonFileItem, node_name: str, on_delete: 
                 # TODO humanize file size
                 {
                     "property": "File size",
-                    "value": format_size(ph_file_item.size),
+                    "value": format_size(photon_node.size),
                 },
                 {
                     "property": "Number of photons",
@@ -377,8 +393,8 @@ def PhotonFileInfoCard(ph_file_item: PhotonFileItem, node_name: str, on_delete: 
             solara.IconButton("delete", on_click=lambda *args: on_delete())
 
 
-@solara.component
-def BurstItemInfoCard(burst_item: BurstItem, node_name: str, on_delete: Callable[[], None]):
+@solara.component  # type: ignore
+def BurstItemInfoCard(node_name: str, burst_node: BurstNode, on_delete: Callable[[], None]):
     headers = [
         {"text": "Filename", "value": "filename"},
         {"text": "Number of bursts", "value": "bursts"},
@@ -389,11 +405,11 @@ def BurstItemInfoCard(burst_item: BurstItem, node_name: str, on_delete: Callable
         {"text": "In-burst countrate (kHz)", "value": "burst_cps"},
     ]
 
-    filenames = burst_item.df["filename"].unique().sort()
+    filenames = burst_node.df["filename"].unique().sort()
     items = []
     for fname in filenames:
         item = {"filename": fname}
-        df = burst_item.df.filter(pl.col("filename") == fname)
+        df = burst_node.df.filter(pl.col("filename") == fname)
 
         item["bursts"] = len(df)
 
@@ -415,8 +431,8 @@ def BurstItemInfoCard(burst_item: BurstItem, node_name: str, on_delete: Callable
         burst_cps = df["n_photons"] / df["time_length"]
         item["burst_cps"] = f"{burst_cps.mean()*1e-3:.2f} ± {burst_cps.std()*1e-3:.2f}"  # type: ignore
 
-    with solara.Card(f"{node_name} / Bursts / {burst_item.name}"):
-        solara.Text(f"Total number of bursts: {len(burst_item.df)}", style="font-weight: bold;")
+    with solara.Card(f"{node_name} / Bursts / {burst_node.name}"):
+        solara.Text(f"Total number of bursts: {len(burst_node.df)}", style="font-weight: bold;")
         solara.HTML(tag="br")
         solara.Text("Bursts statistics per file:")
 
@@ -429,8 +445,8 @@ def BurstItemInfoCard(burst_item: BurstItem, node_name: str, on_delete: Callable
 
         with solara.CardActions():
             solara.FileDownload(
-                burst_item.df.write_csv,
-                filename=f"{burst_item.name}_bursts.csv",
+                burst_node.df.write_csv,
+                filename=f"{burst_node.name}_bursts.csv",
                 children=[
                     solara.Button(
                         "Download burst data.csv",
@@ -439,8 +455,8 @@ def BurstItemInfoCard(burst_item: BurstItem, node_name: str, on_delete: Callable
                 ],
             )
             solara.FileDownload(
-                lambda: yaml.dump(burst_item.search_spec),
-                filename=f"{burst_item.name}_setttings.yaml",
+                lambda: yaml.dump(yaml.dump([asdict(c) for c in burst_node.colors])),
+                filename=f"{burst_node.name}_setttings.yaml",
                 children=[
                     solara.Button(
                         "Download settings",

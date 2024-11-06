@@ -1,51 +1,53 @@
+import uuid
+from dataclasses import replace
+from functools import reduce
+from itertools import chain
+from operator import and_
 from pathlib import Path
+from typing import Callable, Dict, List, Optional, Type, TypedDict, Union
 
+import altair as alt
+import numpy as np
 import solara
 import solara.lab
 import yaml
 
 import dont_fret.web.state as state
-from dont_fret.config.config import cfg
-from dont_fret.web.dev import load_burst_items, load_file_items
+from dont_fret.config.config import BurstFilterItem, cfg
+from dont_fret.web.bursts import BurstPage
+from dont_fret.web.bursts.components import BurstFigure, BurstFigureSelection
+from dont_fret.web.components import RegexSelectDialog
 from dont_fret.web.home import HomePage
 from dont_fret.web.main import Page as MainPage
-from dont_fret.web.models import FRETNode
+from dont_fret.web.models import BurstNode, ListStore, PhotonNode
+from dont_fret.web.trace import TracePage
+from dont_fret.web.utils import (
+    find_index,
+    find_object,
+    get_bursts,
+    make_selector_nodes,
+    wrap_callback,
+)
 
 data = yaml.safe_load(Path("default_testing.yaml").read_text())
 cfg.update(data)
 
+style = """
+.vega-embed {
+    overflow: visible;
+    width: 100% !important;
+}
+"""
 
-# TODO default burst searches from config
-DCBS_TEST = {"DD + DA": {"L": 50, "M": 35, "T": 0.0005}, "AA": {"L": 50, "M": 35, "T": 0.0005}}
-APBS_TEST = {"DD + DA + AA": {"L": 50, "M": 35, "T": 0.0005}}
+my_selection = ListStore([])
 
-pth = "ds2"
-photon_file_items = load_file_items(pth)
-# burst_items = load_burst_items(pth, suffix=".csv")
+values = ["a", "b1", "c1", "d3"]
 
-fret_nodes = [
-    FRETNode(
-        name="FRET NOT",
-        photons=photon_file_items,
-        # bursts=burst_items,
-    ),
-]
-
-# %%
+state.disable_burst_page.set(False)
+state.disable_trace_page.set(False)
 
 
 @solara.component
 def Page():
-    def preload():
-        # state.FRET_NODES.set([])
-        if len(state.fret_nodes.value) == 0:
-            state.fret_nodes.extend(fret_nodes)
-
-    solara.use_effect(preload, dependencies=[])
-    nodes = state.fret_nodes.value
-
-    if len(nodes) != 0:
-        with solara.Column(style={"height": "100%"}):
-            MainPage()
-    else:
-        solara.Text("Loading fret nodes...")
+    solara.Style(style)
+    MainPage()

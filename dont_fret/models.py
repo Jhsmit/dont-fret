@@ -73,6 +73,11 @@ class PhotonData:
         """Average count rate (counts per second / Hz)"""
         return len(self) / float(self.photon_times.max())  # type: ignore
 
+    @property
+    def duration(self) -> Optional[float]:
+        """user-specified duration in seconds, obtained from metadata"""
+        return self.metadata.get("acquisition_duration")
+
     def __getitem__(self, key):
         # TODO sort when slicing backwards?
         return self.__class__(self.data[key], metadata=self.metadata, cfg=self.cfg)
@@ -132,7 +137,7 @@ class PhotonData:
     def tau_mean(self) -> float:
         """Mean of the nanotimes (in seconds). Sometimes referred to as 'fast lifetime' as it is fast to compute"""
         if self.nanotimes is not None and self.nanotimes_unit is not None:
-            return self.nanotimes.mean() * self.nanotimes_unit
+            return self.nanotimes.mean() * self.nanotimes_unit  # type: ignore
         else:
             return np.nan
 
@@ -365,10 +370,16 @@ class Bursts(object):
         self.metadata: dict = metadata or {}
         self.cfg = cfg
 
+        # number of photons per stream per burst
         agg = [(pl.col("stream") == stream).sum().alias(f"n_{stream}") for stream in cfg.streams]
+
+        # mean nanotimes per stream per burst
         agg.extend(
             [
-                pl.when(pl.col("stream") == k).then(pl.col("nanotimes")).mean().alias(f"tau_{k}")
+                pl.when(pl.col("stream") == k)
+                .then(pl.col("nanotimes"))
+                .mean()
+                .alias(f"nanotimes_{k}")
                 for k in cfg.streams
             ]
         )
@@ -387,6 +398,8 @@ class Bursts(object):
             photon_data["burst_index"].unique_counts().alias("n_photons"),
         ]
 
+        # TODO These should move somewhere else; possibly some second step conversion
+        # from raw stamps to times
         t_unit = self.metadata.get("timestamps_unit", None)
         if t_unit is not None:
             columns.extend(
@@ -395,6 +408,14 @@ class Bursts(object):
                     ((pl.col("timestamps_max") - pl.col("timestamps_min")) * t_unit).alias(
                         "time_length"
                     ),
+                ]
+            )
+        nanotimes_unit = self.metadata.get("nanotimes_unit", None)
+        if nanotimes_unit is not None:
+            columns.extend(
+                [
+                    pl.col(f"nanotimes_{stream}").mul(nanotimes_unit).alias(f"tau_{stream}")
+                    for stream in cfg.streams
                 ]
             )
 

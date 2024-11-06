@@ -16,11 +16,6 @@ photons = PhotonData.from_file(PhotonFile(test_data_dir / ptu_file))
 # %%
 
 bursts = photons.burst_search("DCBS")
+bursts.burst_data
 
 # %%
-
-# Export to a dataframe, skip the number of photons but include photon count
-# and mean life time per burst per photon stream.
-
-bursts.burst_data.head()
-print(bursts.burst_data)

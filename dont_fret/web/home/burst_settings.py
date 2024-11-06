@@ -5,15 +5,17 @@ import solara
 from solara.alias import rv
 
 from dont_fret.config import cfg
-from dont_fret.web.reactive import BurstSettingsReactive
+from dont_fret.config.config import BurstColor
+from dont_fret.web.models import BurstSettingsStore, ListStore, use_liststore
 
 
 @solara.component
-def BurstColorSettingForm(
-    burst_settings: BurstSettingsReactive, settings_name: str, color_idx: int
-):
-    burst_color = burst_settings.get_color(settings_name, color_idx)
-    setter = partial(burst_settings.update_color, settings_name, color_idx)
+def BurstColorSettingForm(color_store: ListStore[BurstColor], color_idx: int):
+    burst_color = color_store[color_idx]
+    # burst_color = burst_settings.get_color(settings_name, color_idx)
+
+    setter = partial(color_store.update, color_idx)
+    # setter = partial(burst_settings.update_color, settings_name, color_idx)
     with solara.ColumnsResponsive([8, 4]):
         with solara.Card("Search Thresholds"):
             with solara.Column():
@@ -63,8 +65,9 @@ def BurstColorSettingForm(
 
 
 @solara.component
-def BurstSettingsDialog(burst_settings: BurstSettingsReactive, settings_name, on_close):
-    tab, set_tab = solara.use_state(0)
+def BurstSettingsDialog(colors: list[BurstColor], settings_name, on_value, on_close):
+    tab, set_tab = solara.use_state(0)  # active tab number
+    color_store = use_liststore(colors)
     title = f"Editing burst search settings: '{settings_name}'"
 
     with solara.Card(title):
@@ -73,14 +76,17 @@ def BurstSettingsDialog(burst_settings: BurstSettingsReactive, settings_name, on
             set_tab(val)
 
         def on_tab_remove(*args):
-            burst_settings.remove_color(settings_name)
+            color_store.pop(len(color_store) - 1)
+            # burst_settings.remove_color(settings_name)
 
         def on_tab_add(*args):
-            burst_settings.add_color(settings_name)
+            color_store.append(BurstColor())
+            # burst_settings.add_color(settings_name)
 
         try:
-            n_tabs = len(burst_settings.value[settings_name])
+            n_tabs = len(color_store)
         # This can happen if the settings are reset while a new set was added and is selected
+        # update: not sure how we can get here atm
         except KeyError:
             return
 
@@ -97,14 +103,18 @@ def BurstSettingsDialog(burst_settings: BurstSettingsReactive, settings_name, on
         with rv.TabsItems(v_model=tab):
             for i in range(n_tabs):
                 with rv.TabItem():
-                    BurstColorSettingForm(burst_settings, settings_name, i)
+                    BurstColorSettingForm(color_store, i)
+
+        def save_close():
+            on_value(color_store.items)
+            on_close(False)
 
         with solara.CardActions():
             # todo align center
             with rv.Layout(row=True):
                 solara.Button(
                     label="Save & close",
-                    on_click=lambda *args: on_close(False),
+                    on_click=save_close,
                     text=True,
                     classes=["centered"],
                 )
