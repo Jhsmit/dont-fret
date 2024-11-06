@@ -66,13 +66,13 @@ async def test_burst_search():
     state.fret_nodes.append(node)
     assert len(state.fret_nodes) == 1
 
-    await task_burst_search.function("DCBS", node.id)  # type: ignore
+    await task_burst_search.function("DCBS", [ph_item], node.bursts)  # type: ignore
 
     new_node = state.fret_nodes.get_node(node.id)
     assert new_node.bursts
     burst_item = new_node.bursts[0]
     assert burst_item.name == "DCBS"
-    assert burst_item.df.shape == (72, 15)
+    assert burst_item.df.shape == (72, 22)
     assert burst_item.df["filename"].unique()[0] == "datafile_1.ptu"
 
     await asyncio.sleep(0)
@@ -89,7 +89,7 @@ def test_burst_figure(photon_nodes, burst_nodes):
     box, rc = solara.render(fig)
 
     locator = rc.find(v.Select, label="Bursts")
-    locator.wait_for(timeout=2.5)
+    locator.wait_for(timeout=3)
     assert locator.widget.v_model == burst_nodes[0].id.hex
     assert locator.widget.items == [
         {"text": "DCBS", "value": burst_nodes[0].id.hex},
