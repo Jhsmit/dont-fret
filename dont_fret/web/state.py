@@ -5,15 +5,20 @@ import solara
 
 from dont_fret.config import cfg
 from dont_fret.web.datamanager import ThreadedDataManager
-from dont_fret.web.models import BurstColorList, FRETStore, ListStore, Snackbar
-from dont_fret.web.reactive import BurstSettingsReactive
+from dont_fret.web.models import (
+    BurstColorList,
+    BurstSettingsStore,
+    FRETStore,
+    ListStore,
+    Snackbar,
+)
 
 APP_TITLE = "Don't FRET!"
 
 filebrowser_folder = solara.Reactive[Path](cfg.web.default_dir)
 
 # TODO as liststore
-burst_settings = BurstSettingsReactive(
+burst_settings = BurstSettingsStore(
     {k: BurstColorList(v) for k, v in cfg.burst_search.items()}  # type ignore
 )
 

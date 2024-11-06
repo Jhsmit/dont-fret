@@ -12,14 +12,16 @@ import yaml
 from solara.alias import rv
 
 import dont_fret.web.state as state
+from dont_fret.config.config import BurstColor
 from dont_fret.web.components import EditableTitle
 from dont_fret.web.home.burst_settings import BurstSettingsDialog
 from dont_fret.web.home.methods import task_burst_search
 from dont_fret.web.methods import format_size
-from dont_fret.web.models import BurstNode, PhotonNode
-from dont_fret.web.models import ListStore
-from dont_fret.web.reactive import (
-    BurstSettingsReactive,
+from dont_fret.web.models import (
+    BurstNode,
+    BurstSettingsStore,
+    ListStore,
+    PhotonNode,
 )
 from dont_fret.web.utils import has_photons
 
@@ -46,7 +48,7 @@ def PhotonInfoCard(
     photon_store: ListStore[PhotonNode],
     burst_store: ListStore[BurstNode],
     filebrowser_folder: solara.Reactive[Path],
-    burst_settings: BurstSettingsReactive,
+    burst_settings: BurstSettingsStore,
     # open_: solara.Reactive[list[str]],
 ):
     # todo reactives
@@ -229,7 +231,13 @@ def PhotonInfoCard(
         persistent=False,
         max_width=800,
     ):
-        BurstSettingsDialog(burst_settings, bs_name, on_close=set_show_settings_dialog)
+
+        def on_value(value: list[BurstColor], name=bs_name):
+            burst_settings[name] = value
+
+        BurstSettingsDialog(
+            burst_settings[bs_name], bs_name, on_value=on_value, on_close=set_show_settings_dialog
+        )
 
 
 @solara.component  # type: ignore

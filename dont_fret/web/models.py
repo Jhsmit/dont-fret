@@ -3,15 +3,27 @@ from __future__ import annotations
 import dataclasses
 import uuid
 from collections import UserList
-from dataclasses import dataclass, field, make_dataclass
+from dataclasses import dataclass, field, make_dataclass, replace
 from pathlib import Path
-from typing import Callable, ContextManager, Generic, Optional, Tuple, TypedDict, TypeVar
+from typing import (
+    Callable,
+    ContextManager,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Tuple,
+    TypedDict,
+    TypeVar,
+)
 
 import numpy as np
 import polars as pl
 import solara
+from solara import Reactive
 from solara.toestand import merge_state
 
+from dont_fret import cfg
 from dont_fret.config.config import BurstColor, BurstFilterItem
 
 T = TypeVar("T")
@@ -248,11 +260,25 @@ class _NoDefault:
 NO_DEFAULT = _NoDefault()
 
 
-class ListStore(Generic[T]):
+class Store(Generic[T]):
+    def __init__(self, initial_value: T):
+        self._reactive = solara.reactive(initial_value)
+
+    def subscribe(self, listener: Callable[[T], None], scope: Optional[ContextManager] = None):
+        return self._reactive.subscribe(listener, scope=scope)
+
+    def subscribe_change(
+        self, listener: Callable[[T, T], None], scope: Optional[ContextManager] = None
+    ):
+        return self._reactive.subscribe_change(listener, scope=scope)
+
+
+class ListStore(Store[list[T]]):
     """baseclass for reactive list"""
 
     def __init__(self, items: Optional[list[T]] = None):
-        self._items = solara.reactive(items if items is not None else [])
+        super().__init__(items if items is not None else [])
+        # self._reactive = solara.reactive(items if items is not None else [])
 
     def __len__(self):
         return len(self.items)
@@ -263,65 +289,66 @@ class ListStore(Generic[T]):
     def __iter__(self):
         return iter(self.items)
 
-    @property
+    @property  # TODO perhaps refactor to value
     def items(self):
-        return self._items.value
+        return self._reactive.value
 
     def get_item(self, idx: int, default: R = NO_DEFAULT) -> T | R:
         try:
-            return self._items.value[idx]
+            return self._reactive.value[idx]
         except IndexError:
             if default is NO_DEFAULT:
                 raise IndexError(f"Index {idx} is out of range")
             return default
 
     def set(self, items: list[T]) -> None:
-        self._items.value = items
+        self._reactive.value = items
 
     def set_item(self, idx: int, item: T) -> None:
-        new_items = self._items.value.copy()
+        new_items = self._reactive.value.copy()
         if idx == len(new_items):
             new_items.append(item)
         elif idx < len(new_items):
             new_items[idx] = item
         else:
             raise IndexError(f"Index {idx} is out of range")
-        self._items.value = new_items
+        self._reactive.value = new_items
 
     def append(self, item: T) -> None:
-        self._items.value = [*self._items.value, item]
+        self._reactive.value = [*self._reactive.value, item]
 
     def extend(self, items: list[T]) -> None:
         new_value = self.items.copy()
         new_value.extend(items)
-        self._items.value = new_value
+        self._reactive.value = new_value
+
+    def insert(self, idx: int, item: T) -> None:
+        new_value = self.items.copy()
+        new_value.insert(idx, item)
+        self._reactive.value = new_value
+
+    def remove(self, item: T) -> None:
+        self._reactive.value = [it for it in self.items if it != item]
 
     def pop(self, idx: int) -> T:
         item = self.items[idx]
-        self._items.value = self.items[:idx] + self.items[idx + 1 :]
+        self._reactive.value = self.items[:idx] + self.items[idx + 1 :]
         return item
 
-    def remove(self, item: T) -> None:
-        self._items.value = [it for it in self.items if it != item]
+    def clear(self) -> None:
+        self._reactive.value = []
+
+    def index(self, item: T) -> int:
+        return self.items.index(item)
 
     def update(self, idx: int, **kwargs):
         new_value = self.items.copy()
         updated_item = merge_state(new_value[idx], **kwargs)
         new_value[idx] = updated_item
-        self._items.value = new_value
+        self._reactive.value = new_value
 
-    def index(self, item: T) -> int:
-        return self.items.index(item)
-
-    def subscribe(
-        self, listener: Callable[[list[T]], None], scope: Optional[ContextManager] = None
-    ):
-        return self._items.subscribe(listener, scope=scope)
-
-    def subscribe_change(
-        self, listener: Callable[[list[T], list[T]], None], scope: Optional[ContextManager] = None
-    ):
-        return self._items.subscribe_change(listener, scope=scope)
+    def count(self, item: T) -> int:
+        return self.items.count(item)
 
 
 def use_liststore(value: list[T] | ListStore[T]) -> ListStore[T]:
@@ -331,12 +358,63 @@ def use_liststore(value: list[T] | ListStore[T]) -> ListStore[T]:
         if not isinstance(value, ListStore):
             return ListStore(value)
 
-    store = solara.use_memo(make_liststore, [])
+    store = solara.use_memo(make_liststore, [value])  # type ignore
     if isinstance(value, ListStore):
+        raise ValueError("look at use_reactive to implement all cases properly")
         store = value
     assert store is not None
 
     return store
+
+
+solara.use_reactive
+K = TypeVar("K")
+V = TypeVar("V")
+
+
+class DictStore(Store[dict[K, V]]):
+    # todo maybe require values to be a dict
+    def __init__(self, values: Optional[dict] = None):
+        super().__init__(values if values is not None else {})
+
+    @property
+    def value(self):
+        return self._reactive.value
+
+    def set(self, items: dict[K, V]) -> None:
+        self._reactive.value = items
+
+    def __len__(self) -> int:
+        return len(self._reactive.value)
+
+    def __getitem__(self, key):
+        return self._reactive.value[key]
+
+    def __setitem__(self, key, value):
+        new_value = self._reactive.value.copy()
+        new_value[key] = value
+        self._reactive.value = new_value
+
+    def items(self):
+        return self._reactive.value.items()
+
+    def keys(self):
+        return self._reactive.value.keys()
+
+    def values(self):
+        return self._reactive.value.values()
+
+    def pop(self, key) -> V:
+        new_value = self._reactive.value.copy()
+        item = new_value.pop(key)
+        self.set(new_value)
+        return item
+
+    def popitem(self) -> tuple[K, V]:
+        new_value = self._reactive.value.copy()
+        item = new_value.popitem()
+        self.set(new_value)
+        return item
 
 
 @dataclasses.dataclass
@@ -398,3 +476,44 @@ class SelectorNode:
     @property
     def record(self) -> dict:
         return {"text": self.text, "value": self.value}
+
+
+class BurstSettingsStore(DictStore[str, list[BurstColor]]):
+    """TODO most of these methods are now unused"""
+
+    def reset(self) -> None:
+        self.set({k: v for k, v in cfg.burst_search.items()})
+
+    def add_settings(self, setting_name: str):
+        """Adds a new burst settings name with default settings."""
+        new_value = self.value.copy()
+        new_value[setting_name] = [BurstColor()]
+        self.set(new_value)
+
+    def remove_settings(self, setting_name: str):
+        self.pop(setting_name)
+
+    def remove_color(self, setting_name: str):
+        """Removes the last color from the list of colors for a given burst settings name."""
+        new_colors = self.value[setting_name].copy()
+        if len(new_colors) == 1:
+            return
+        new_colors.pop()
+        self[setting_name] = new_colors
+
+    def update_color(self, settings_name: str, color_idx: int, **kwargs):
+        new_colors = self.value[settings_name].copy()
+        new_colors[color_idx] = replace(new_colors[color_idx], **kwargs)
+        self[settings_name] = new_colors
+
+    def get_color(self, settings_name: str, color_idx: int) -> BurstColor:
+        return self.value[settings_name][color_idx]
+
+    def add_color(self, settings_name: str):
+        colors = self.value[settings_name]
+        colors.append(BurstColor())
+        self[settings_name] = colors
+
+    @property
+    def settings_names(self) -> list[str]:
+        return list(self.keys())

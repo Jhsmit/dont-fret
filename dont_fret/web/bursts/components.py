@@ -462,7 +462,7 @@ class BurstFigureSelection:
     )
 
     def __post_init__(self):
-        self.fret_store._items.subscribe(self.on_fret_store)
+        self.fret_store._reactive.subscribe(self.on_fret_store)
         self.reset()
 
     def on_fret_store(self, new_value: list[FRETNode]):
