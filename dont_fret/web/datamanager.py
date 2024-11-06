@@ -17,7 +17,7 @@ import polars as pl
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
-from dont_fret.web.methods import get_duration, get_info
+from dont_fret.web.methods import get_duration, get_info, make_burst_dataframe
 from dont_fret.web.models import BurstNode, PhotonNode
 
 
@@ -106,10 +106,8 @@ class ThreadedDataManager:
             task = asyncio.create_task(self.get_bursts(ph_node, burst_colors))
             tasks.append(task)
 
-        # results = []
         for i, f in enumerate(asyncio.as_completed(tasks)):
-            # result = await f
-            # results.append(result)
+            await f
             progress = (i + 1) * (100 / len(tasks))
             on_progress(progress)
 
@@ -125,7 +123,7 @@ class ThreadedDataManager:
     ) -> pl.DataFrame:
         on_progress = on_progress or (lambda _: None)
         on_progress(True)
-
+        raise DeprecationWarning("USe get burst node instead")
         results = await self.get_bursts_batch(photon_nodes, burst_colors, on_progress)
         on_progress(True)
 
@@ -148,7 +146,9 @@ class ThreadedDataManager:
         name: str = "",
         on_progress: Optional[Callable[[float | bool], None]] = None,
     ) -> BurstNode:
-        burst_df = await self.get_dataframe(photon_nodes, burst_colors, on_progress=on_progress)
+        bursts = await self.get_bursts_batch(photon_nodes, burst_colors, on_progress=on_progress)
+        bursts_df = make_burst_dataframe(bursts, names=[ph_node.name for ph_node in photon_nodes])
+        # burst_df = await self.get_dataframe(photon_nodes, burst_colors, on_progress=on_progress)
         info_list = [await self.get_info(node) for node in photon_nodes]
 
         duration = get_duration(info_list)
@@ -156,7 +156,7 @@ class ThreadedDataManager:
 
         node = BurstNode(
             name=name or f"burst_node-{id}",
-            df=burst_df,
+            df=bursts_df,
             colors=burst_colors,
             photon_nodes=photon_nodes,
             duration=duration,

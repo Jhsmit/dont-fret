@@ -4,15 +4,50 @@ import itertools
 import math
 from functools import reduce
 from operator import and_
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union
+from typing import Literal, Optional, TypedDict, Union
 
+import numpy as np
 import polars as pl
 
-from dont_fret.models import PhotonData
-from dont_fret.web.models import BurstFilterItem
+from dont_fret.config.config import BurstColor
+from dont_fret.fileIO import PhotonFile
+from dont_fret.models import Bursts, PhotonData
+from dont_fret.web.models import BurstFilterItem, BurstNode, FRETNode, PhotonNode
 
-if TYPE_CHECKING:
-    from dont_fret.web.datamanager import FRETNode
+
+def make_burst_dataframe(
+    bursts: list[Bursts], names: Optional[list[str]], name_column="filename"
+) -> pl.DataFrame:
+    """Convert a list of `Bursts` objects into a `polars.DataFrame`."""
+
+    concat = pl.concat([b.burst_data for b in bursts], how="vertical_relaxed")
+    if names:
+        lens = [len(burst) for burst in bursts]
+        dtype = pl.Enum(categories=names)
+        series = pl.Series(name=name_column, values=np.repeat(names, lens), dtype=dtype)
+
+        return concat.with_columns(series)
+    else:
+        return concat
+
+
+def make_burst_nodes(
+    photon_nodes: list[PhotonNode], burst_settings: dict[str, list[BurstColor]]
+) -> list[BurstNode]:
+    photons = [PhotonData.from_file(PhotonFile(node.file_path)) for node in photon_nodes]
+    burst_nodes = []
+    # todo tqdm?
+    for name, burst_colors in burst_settings.items():
+        bursts = [photons.burst_search(burst_colors) for photons in photons]
+        infos = [get_info(photons) for photons in photons]
+        duration = get_duration(infos)
+        df = make_burst_dataframe(bursts, names=[node.name for node in photon_nodes])
+        node = BurstNode(
+            name=name, df=df, colors=burst_colors, photon_nodes=photon_nodes, duration=duration
+        )
+        burst_nodes.append(node)
+
+    return burst_nodes
 
 
 def chain_filters(filters: list[BurstFilterItem]) -> Union[pl.Expr, Literal[True]]:
