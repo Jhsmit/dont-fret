@@ -2,13 +2,10 @@ import solara
 import solara.lab
 
 import dont_fret.web.state as state
-from dont_fret.web.methods import get_duration
-from dont_fret.web.models import BurstNode, PhotonNode
+from dont_fret.web.models import PhotonNode
 from dont_fret.web.utils import has_bursts
 
 
-# todo pass callable to add item on done
-# todo pass callable to add item on done
 @solara.lab.task(prefer_threaded=False)  # type: ignore
 async def task_burst_search(name: str, photon_nodes: list[PhotonNode], burst_store) -> None:
     # name: name of burst search settings as well as its output name
