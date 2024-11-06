@@ -106,12 +106,14 @@ class ThreadedDataManager:
             task = asyncio.create_task(self.get_bursts(ph_node, burst_colors))
             tasks.append(task)
 
-        results = []
+        # results = []
         for i, f in enumerate(asyncio.as_completed(tasks)):
-            result = await f
-            results.append(result)
+            # result = await f
+            # results.append(result)
             progress = (i + 1) * (100 / len(tasks))
             on_progress(progress)
+
+        results = await asyncio.gather(*tasks)
 
         return results
 
