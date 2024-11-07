@@ -659,7 +659,13 @@ def BurstFigure(
 
     figure_task = solara.lab.use_task(  # type: ignore
         redraw,
-        dependencies=[burst_node.id, plot_settings.value, file_store.items, state.filters.items],
+        dependencies=[
+            burst_node.id,
+            plot_settings.value,
+            file_store.items,
+            state.filters.items,
+            dark_effective,
+        ],
     )
 
     with solara.Card():
