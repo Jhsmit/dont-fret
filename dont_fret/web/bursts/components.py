@@ -127,7 +127,12 @@ def make_overlay_chart(
 
 @solara.component
 def SelectionChart(chart: alt.Chart | alt.LayerChart, on_selection):
-    jchart = alt.JupyterChart.element(chart=chart, embed_options={"actions": False})  # type: ignore
+    dark_effective = solara.lab.use_dark_effective()
+    if dark_effective:
+        options = {"actions": False, "theme": "dark"}
+    else:
+        options = {"actions": False}
+    jchart = alt.JupyterChart.element(chart=chart, embed_options=options)  # type: ignore
 
     def bind():
         widget = cast(alt.JupyterChart, solara.get_widget(jchart))

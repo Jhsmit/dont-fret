@@ -14,6 +14,7 @@ from dont_fret.config import cfg
 from dont_fret.web.bursts import BurstPage
 from dont_fret.web.components import Snackbar
 from dont_fret.web.home import HomePage
+from dont_fret.web.methods import use_dark_altair
 from dont_fret.web.models import BurstColorList
 from dont_fret.web.state import disable_burst_page, disable_trace_page
 from dont_fret.web.trace import TracePage
@@ -67,6 +68,7 @@ def Page():
     password = solara.use_reactive("")
 
     solara.Style(SCRIPT_PATH / "style.css")
+    use_dark_altair()
 
     def initialize():
         # TODO burst settings as listStore

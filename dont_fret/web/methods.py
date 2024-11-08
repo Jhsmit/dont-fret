@@ -6,13 +6,27 @@ from functools import reduce
 from operator import and_
 from typing import Literal, Optional, TypedDict, Union
 
+import altair as alt
 import numpy as np
 import polars as pl
+import solara
+import solara.lab
 
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
 from dont_fret.web.models import BurstFilterItem, BurstNode, FRETNode, PhotonNode
+
+
+def use_dark_altair():
+    dark_effective = solara.lab.use_dark_effective()
+    dark_effective_previous = solara.use_previous(dark_effective)
+    if dark_effective != dark_effective_previous:
+        if dark_effective:
+            alt.themes.enable("dark")
+
+        else:
+            alt.themes.enable("default")
 
 
 def make_burst_dataframe(
