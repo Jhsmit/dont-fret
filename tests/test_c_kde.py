@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 import polars.testing as pl_test
 
-from dont_fret.channel_kde import alex_2cde, convolve_stream, make_kernel
+from dont_fret.channel_kde import compute_alex_2cde, convolve_stream, make_kernel
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import PhotonData
 
@@ -44,5 +44,5 @@ def test_compare_cde_fretbursts():
 
     burst_data = pl.concat(burst_dfs, how="vertical_relaxed")
 
-    alex_2cde_vals = alex_2cde(burst_data, kde_data)
+    alex_2cde_vals = compute_alex_2cde(burst_data, kde_data)
     pl_test.assert_series_equal(alex_2cde_vals.fill_null(np.nan), bursts_ref["alex_2cde"])

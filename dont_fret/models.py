@@ -250,18 +250,21 @@ class PhotonData:
         # Check if any of the times _items is empty, if so, bursts is empty
         if any(len(t) == 0 for t in times_list):
             burst_photons = pl.DataFrame({k: [] for k in self.data.columns + ["burst_index"]})
+            indices = pl.DataFrame({"imin": [], "imax": []})
         else:
             # Take the intersection of the time intervals found by the multi-color burst search
             final_times = reduce(return_intersections, times_list)
 
             if len(final_times) == 0:  # No overlap found
                 burst_photons = pl.DataFrame({k: [] for k in self.data.columns + ["burst_index"]})
+                indices = pl.DataFrame({"imin": [], "imax": []})
             else:
                 tmin, tmax = np.array(final_times).T
 
                 # Convert back to indices
                 imin = np.searchsorted(self.timestamps, tmin)
                 imax = np.searchsorted(self.timestamps, tmax)
+                indices = pl.DataFrame({"imin": imin, "imax": imax})
                 # take all photons (up to and including? edges need to be checked!)
                 b_num = int(2 ** np.ceil(np.log2((np.log2(len(imin))))))
                 dtype = getattr(pl, f"UInt{b_num}", pl.Int32)
@@ -271,7 +274,7 @@ class PhotonData:
                 ]
                 burst_photons = pl.concat(bursts)
 
-        bs = Bursts(burst_photons, metadata=self.metadata)
+        bs = Bursts(burst_photons, indices=indices, metadata=self.metadata)
 
         return bs
 
@@ -364,9 +367,14 @@ class Bursts(object):
     # todo add metadata support
     # bursts: numpy.typing.ArrayLike[Bursts] ?
     def __init__(
-        self, photon_data: pl.DataFrame, metadata: Optional[dict] = None, cfg: DontFRETConfig = cfg
+        self,
+        photon_data: pl.DataFrame,
+        indices: pl.DataFrame,
+        metadata: Optional[dict] = None,
+        cfg: DontFRETConfig = cfg,
     ):
         self.photon_data = photon_data
+        self.indices = indices
         self.metadata: dict = metadata or {}
         self.cfg = cfg
 

@@ -19,7 +19,57 @@ from numba import float64, int64, jit, types
 from dont_fret.expr import is_in_expr
 
 
-def alex_2cde(
+def compute_fret_2cde(
+    indices: pl.DataFrame,
+    kde_rates,
+) -> np.ndarray:
+    output = np.empty(len(indices), dtype=float)
+    for idx, (imin, imax) in enumerate(indices.iter_rows()):
+        # df = kde_rates[imin:imax+1] # this is slower
+        df = kde_rates.slice(imin, imax - imin + 1)
+
+        # filtering like this is also slower
+        # df_f_DA = df.filter(f_DA)  # select only the DA photons, thus these are for KDE^X_DA
+        # df_f_DD = df.filter(f_DD)  # KDE^X_DD (density of ch X at DD timestamps)
+
+        # kde_DA_DA = df_f_DA['DA'] # select DA density - kde^DA_DA
+        # kde_DA_DD = df_f_DD['DA'] # kde^DA_DD (in the paper called kde^A_D)
+        # kde_DD_DD = df_f_DD['DD'] # kde^DD_DD
+        # kde_DD_DA = df_f_DA['DD'] # kde^DD_DA
+
+        bools_DA = df["stream"] == "DA"
+        bools_DD = df["stream"] == "DD"
+
+        kde_DA_DA = df["DA"].filter(bools_DA)  # select DA density - kde^DA_DA
+        kde_DA_DD = df["DA"].filter(bools_DD)  # kde^DA_DD (in the paper called kde^A_D)
+        kde_DD_DD = df["DD"].filter(bools_DD)  # kde^DD_DD
+        kde_DD_DA = df["DD"].filter(bools_DA)  # kde^DD_DA
+
+        try:
+            nbkde_DA_DA = (1 + 2 / len(kde_DA_DA)) * (kde_DA_DA - 1)
+            nbkde_DD_DD = (1 + 2 / len(kde_DD_DD)) * (kde_DD_DD - 1)
+
+            # ED = (kde_DA_DD / (kde_DA_DD + nbkde_DD_DD)).sum() / nbkde_DD_DD.count()
+            # EA = (kde_DD_DA / (kde_DD_DA + nbkde_DA_DA)).sum() / nbkde_DA_DA.count() # = (1 - E)_A
+
+            # when denom is zero, it doesnt count towards number of photons
+            # see "Such cases are removed by the computer algorithm", in Tomov et al.
+            denom = kde_DA_DD + nbkde_DD_DD
+            ED = (kde_DA_DD / denom).sum() / (denom != 0.0).sum()  # when
+
+            denom = kde_DD_DA + nbkde_DA_DA
+            EA = (kde_DD_DA / denom).sum() / (denom != 0.0).sum()  # = (1 - E)_A
+
+            fret_cde = 110 - 100 * (ED + EA)
+            output[idx] = fret_cde
+        except ZeroDivisionError:
+            output[idx] = np.nan
+
+    return output
+
+
+# refactor to indices / loop
+def compute_alex_2cde(
     burst_photons: pl.DataFrame,
     kde_rates: pl.DataFrame,
     dex_streams: Optional[list[str]] = None,
@@ -39,11 +89,14 @@ def alex_2cde(
 
     # equivalent to (but faster):
     # joined_df = burst_photons.join(kde_rates, on=['timestamps', 'stream'], how='inner')
-    j1 = burst_photons.join(kde_rates, on=["timestamps"], how="left")
-    joined_df = j1.filter(pl.col("stream") == pl.col("stream_right"))
-    # joined_df = burst_photons.join(kde_rates, on=["timestamps"], how="left").filter(
-    #     pl.col("stream") == pl.col("stream_right")
-    # )
+    # still, this is the slowest step. would be nice if we can improve since we know the indices
+
+    # remove comments after passing test:
+    # j1 = burst_photons.join(kde_rates, on=["timestamps"], how="left")
+    # joined_df = j1.filter(pl.col("stream") == pl.col("stream_right"))
+    joined_df = burst_photons.join(kde_rates, on=["timestamps"], how="left").filter(
+        pl.col("stream") == pl.col("stream_right")
+    )
 
     b_df = joined_df.select(
         [
@@ -67,9 +120,12 @@ def alex_2cde(
     combined = pl.concat([agg_dex, agg_dax], how="align")
 
     # tomov et al eqn 12
+    # this is an addition in the paper
+    # in fretbursts its subtracted
     ax_2cde_bracket = (1 / pl.col("N_aex")) * pl.col("ratio_AD") - (1 / pl.col("N_dex")) * pl.col(
         "ratio_DA"
     )
+
     ax_2cde_norm = pl.lit(100) - pl.lit(50) * ax_2cde_bracket
 
     alex_2cde = combined.select(ax_2cde_norm.alias("alex_2cde")).to_series()
@@ -104,6 +160,9 @@ def convolve_stream(data: pl.DataFrame, streams: list[str], kernel: np.ndarray) 
     event_times = df["timestamps"].to_numpy(allow_copy=True)
     eval_times = data["timestamps"].to_numpy(allow_copy=True)
 
+    # event_times = np.array(df["timestamps"])
+    # eval_times = np.array(data["timestamps"])
+
     return async_convolve(event_times, eval_times, kernel)
 
 
@@ -113,8 +172,7 @@ def convolve_stream(data: pl.DataFrame, streams: list[str], kernel: np.ndarray) 
         types.Array(int64, 1, "C", readonly=True),
         types.Array(float64, 1, "C", readonly=True),
     ),
-    nopython=True,
-    cache=True,
+    nopython=False,
     nogil=True,
 )
 def async_convolve(event_times, eval_times, kernel):
@@ -128,12 +186,16 @@ def async_convolve(event_times, eval_times, kernel):
 
     for i, time in enumerate(eval_times):
         while event_times[i_upper] < time + window_half_size:
-            if i_upper == len(event_times):
-                break
             i_upper += 1
+            if i_upper == len(event_times):
+                i_upper -= 1
+                break
 
         while event_times[i_lower] < time - window_half_size:
             i_lower += 1
+            if i_lower == len(event_times):
+                i_lower -= 1
+                break
 
         for j in range(i_lower, i_upper):
             idx = event_times[j] - time + window_half_size
