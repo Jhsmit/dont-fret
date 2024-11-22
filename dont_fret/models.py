@@ -373,7 +373,7 @@ class Bursts:
     burst_data: pl.DataFrame
     photon_data: pl.DataFrame
     metadata: Optional[dict] = None
-    cfg: DontFRETConfig = cfg
+    cfg: Optional[DontFRETConfig] = None
 
     @classmethod
     def from_photons(
