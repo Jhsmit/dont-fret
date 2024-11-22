@@ -48,6 +48,10 @@ class Web:
     burst_filters: list[BurstFilterItem] = field(default_factory=list)
     password: Optional[str] = None
 
+    # todo configurable settings
+    fret_2cde: bool = True  # calculate fret_2cde after burst search with default settings
+    alex_2cde: bool = True
+
 
 @dataclass
 class BurstColor:

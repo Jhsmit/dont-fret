@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from functools import cached_property, reduce
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
@@ -9,6 +10,7 @@ import numpy as np
 import polars as pl
 
 from dont_fret.burst_search import bs_eggeling, return_intersections
+from dont_fret.channel_kde import compute_alex_2cde, compute_fret_2cde, convolve_stream, make_kernel
 from dont_fret.config.config import BurstColor, DontFRETConfig, cfg
 from dont_fret.support import get_binned
 from dont_fret.utils import clean_types
@@ -267,14 +269,16 @@ class PhotonData:
                 indices = pl.DataFrame({"imin": imin, "imax": imax})
                 # take all photons (up to and including? edges need to be checked!)
                 b_num = int(2 ** np.ceil(np.log2((np.log2(len(imin))))))
-                dtype = getattr(pl, f"UInt{b_num}", pl.Int32)
+                index_dtype = getattr(pl, f"UInt{b_num}", pl.Int32)
                 bursts = [
-                    self.data[i1 : i2 + 1].with_columns(pl.lit(bi).alias("burst_index").cast(dtype))
+                    self.data[i1 : i2 + 1].with_columns(
+                        pl.lit(bi).alias("burst_index").cast(index_dtype)
+                    )
                     for bi, (i1, i2) in enumerate(zip(imin, imax))
                 ]
                 burst_photons = pl.concat(bursts)
 
-        bs = Bursts(burst_photons, indices=indices, metadata=self.metadata)
+        bs = Bursts.from_photons(burst_photons, metadata=self.metadata)
 
         return bs
 
@@ -356,27 +360,29 @@ class BinnedPhotonData:
         return len(self.time)
 
 
-class Bursts(object):
+@dataclass
+class Bursts:
     """
     Class which holds a set of bursts.
 
     attrs:
-    bursts np.array with Burst Objects
+    burst_data Dataframe with per-burst aggregated data
+    photon_data Dataframe with per-photon data
     """
 
-    # todo add metadata support
-    # bursts: numpy.typing.ArrayLike[Bursts] ?
-    def __init__(
-        self,
+    burst_data: pl.DataFrame
+    photon_data: pl.DataFrame
+    metadata: Optional[dict] = None
+    cfg: DontFRETConfig = cfg
+
+    @classmethod
+    def from_photons(
+        cls,
         photon_data: pl.DataFrame,
-        indices: pl.DataFrame,
         metadata: Optional[dict] = None,
         cfg: DontFRETConfig = cfg,
-    ):
-        self.photon_data = photon_data
-        self.indices = indices
-        self.metadata: dict = metadata or {}
-        self.cfg = cfg
+    ) -> Bursts:
+        # todo move to classmethod
 
         # number of photons per stream per burst
         agg = [(pl.col("stream") == stream).sum().alias(f"n_{stream}") for stream in cfg.streams]
@@ -408,7 +414,7 @@ class Bursts(object):
 
         # TODO These should move somewhere else; possibly some second step conversion
         # from raw stamps to times
-        t_unit = self.metadata.get("timestamps_unit", None)
+        t_unit = metadata.get("timestamps_unit", None)
         if t_unit is not None:
             columns.extend(
                 [
@@ -418,7 +424,7 @@ class Bursts(object):
                     ),
                 ]
             )
-        nanotimes_unit = self.metadata.get("nanotimes_unit", None)
+        nanotimes_unit = metadata.get("nanotimes_unit", None)
         if nanotimes_unit is not None:
             columns.extend(
                 [
@@ -427,27 +433,64 @@ class Bursts(object):
                 ]
             )
 
-        self.burst_data = (
-            self.photon_data.group_by("burst_index", maintain_order=True)
-            .agg(agg)
-            .with_columns(columns)
+        burst_data = (
+            photon_data.group_by("burst_index", maintain_order=True).agg(agg).with_columns(columns)
         )
+
+        return Bursts(burst_data, photon_data, metadata=metadata, cfg=cfg)
 
     @classmethod
     def load(cls, directory: Path) -> Bursts:
-        data = pl.read_parquet(directory / "data.pq")
+        burst_data = pl.read_parquet(directory / "burst_data.pq")
+        photon_data = pl.read_parquet(directory / "photon_data.pq")
         with open(directory / "metadata.json", "r") as f:
             metadata = json.load(f)
 
         cfg = DontFRETConfig.from_yaml(directory / "config.yaml")
-        return Bursts(data, metadata, cfg)
+        return Bursts(burst_data, photon_data, metadata, cfg)
 
     def save(self, directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
-        self.photon_data.write_parquet(directory / "data.pq")
+        self.burst_data.write_parquet(directory / "burst_data.pq")
+        self.photon_data.write_parquet(directory / "photon_data.pq")
+
         with open(directory / "metadata.json", "w") as f:
             json.dump(self.metadata, f)
         self.cfg.to_yaml(directory / "config.yaml")
+
+    def fret_2cde(self, photons: PhotonData, tau: float = 50e-6) -> Bursts:
+        assert photons.timestamps_unit
+        kernel = make_kernel(tau, photons.timestamps_unit)
+        DA = convolve_stream(photons.data, ["DA"], kernel)
+        DD = convolve_stream(photons.data, ["DD"], kernel)
+        kde_data = photons.data.select(
+            [pl.col("timestamps"), pl.col("stream"), pl.lit(DA).alias("DA"), pl.lit(DD).alias("DD")]
+        )
+
+        fret_2cde = compute_fret_2cde(self.photon_data, kde_data)
+        burst_data = self.burst_data.with_columns(pl.lit(fret_2cde).alias("fret_2cde"))
+
+        return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
+
+    def alex_2cde(self, photons: PhotonData, tau: float = 50e-6) -> Bursts:
+        assert photons.timestamps_unit
+        kernel = make_kernel(tau, photons.timestamps_unit)
+        D_ex = convolve_stream(photons.data, ["DD", "DA"], kernel)
+        A_ex = convolve_stream(photons.data, ["AA"], kernel)  # crashed the kernel (sometimes)
+
+        kde_data = photons.data.select(
+            [
+                pl.col("timestamps"),
+                pl.col("stream"),
+                pl.lit(D_ex).alias("D_ex"),
+                pl.lit(A_ex).alias("A_ex"),
+            ]
+        )
+
+        alex_2cde = compute_alex_2cde(self.photon_data, kde_data)
+        burst_data = self.burst_data.with_columns(pl.lit(alex_2cde).alias("alex_2cde"))
+
+        return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
 
     def __len__(self) -> int:
         """Number of bursts"""
@@ -459,6 +502,8 @@ class Bursts(object):
     @property
     def timestamps_unit(self) -> Optional[float]:
         """Multiplication factor to covert timestamps integers to seconds"""
+        if self.metadata is None:
+            return None
         try:
             return self.metadata["timestamps_unit"]
         except KeyError:

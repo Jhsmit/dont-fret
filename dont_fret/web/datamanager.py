@@ -11,22 +11,21 @@ from typing import (
     Optional,
 )
 
-import numpy as np
-import polars as pl
-
-from dont_fret.config.config import BurstColor
+from dont_fret.config.config import BurstColor, DontFRETConfig, cfg
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
+from dont_fret.process import full_search
 from dont_fret.web.methods import get_duration, get_info, make_burst_dataframe
 from dont_fret.web.models import BurstNode, PhotonNode
 
 
 class ThreadedDataManager:
-    def __init__(self) -> None:
+    def __init__(self, cfg: DontFRETConfig = cfg) -> None:
         self.photon_cache: Dict[uuid.UUID, asyncio.Future[PhotonData]] = {}
         self.burst_cache: Dict[tuple[uuid.UUID, str], asyncio.Future[Bursts]] = {}
         self.executor = ThreadPoolExecutor(max_workers=4)  # todo config wokers
         self.running_jobs = {}
+        self.cfg = cfg
 
     # todo allow passing loop to init
     @property
@@ -78,7 +77,9 @@ class ThreadedDataManager:
             self.burst_cache[key] = future
 
             try:
-                bursts = await self.search(photon_node, burst_colors)
+                photon_data = await self.get_photons(photon_node)
+                bursts = await self.run(full_search, photon_data, burst_colors, self.cfg)
+
                 future.set_result(bursts)
             except Exception as e:
                 self.burst_cache.pop(key)
@@ -115,29 +116,15 @@ class ThreadedDataManager:
 
         return results
 
-    async def get_dataframe(
-        self,
-        photon_nodes: list[PhotonNode],
-        burst_colors: list[BurstColor],
-        on_progress: Optional[Callable[[float | bool], None]] = None,
-    ) -> pl.DataFrame:
-        on_progress = on_progress or (lambda _: None)
-        on_progress(True)
-        raise DeprecationWarning("USe get burst node instead")
-        results = await self.get_bursts_batch(photon_nodes, burst_colors, on_progress)
-        on_progress(True)
+    async def alex_2cde(self, photon_node: PhotonNode, bursts: Bursts) -> Bursts:
+        photons = await self.get_photons(photon_node)
+        new_bursts = self.run(bursts.alex_2cde, photons)
+        return await new_bursts
 
-        names = [ph_node.name for ph_node in photon_nodes]
-        lens = [len(burst) for burst in results]
-
-        dtype = pl.Enum(categories=names)
-        filenames = pl.Series(name="filename", values=np.repeat(names, lens), dtype=dtype)
-
-        df = pl.concat([b.burst_data for b in results], how="vertical_relaxed").with_columns(
-            filenames
-        )
-
-        return df
+    async def fret_2cde(self, photon_node: PhotonNode, bursts: Bursts) -> Bursts:
+        photons = await self.get_photons(photon_node)
+        new_bursts = self.run(bursts.fret_2cde, photons)
+        return await new_bursts
 
     async def get_burst_node(
         self,
@@ -148,7 +135,6 @@ class ThreadedDataManager:
     ) -> BurstNode:
         bursts = await self.get_bursts_batch(photon_nodes, burst_colors, on_progress=on_progress)
         bursts_df = make_burst_dataframe(bursts, names=[ph_node.name for ph_node in photon_nodes])
-        # burst_df = await self.get_dataframe(photon_nodes, burst_colors, on_progress=on_progress)
         info_list = [await self.get_info(node) for node in photon_nodes]
 
         duration = get_duration(info_list)
