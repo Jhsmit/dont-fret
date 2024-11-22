@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import polars as pl
 
 from dont_fret.channel_kde import compute_alex_2cde, compute_fret_2cde, convolve_stream, make_kernel
-from dont_fret.expr import is_in_expr
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import PhotonData
 
@@ -36,24 +35,32 @@ A_ex = convolve_stream(photons.data, ["AA"], kernel)  # crashed the kernel (some
 kde_data = photons.data.select(
     [pl.col("timestamps"), pl.col("stream"), pl.lit(D_ex).alias("D_ex"), pl.lit(A_ex).alias("A_ex")]
 )
+
+# %%
 alex_2cde = compute_alex_2cde(bursts.photon_data, kde_data)
 
+# %%
 DA = convolve_stream(photons.data, ["DA"], kernel)
 DD = convolve_stream(photons.data, ["DD"], kernel)
 kde_data = photons.data.select(
     [pl.col("timestamps"), pl.col("stream"), pl.lit(DA).alias("DA"), pl.lit(DD).alias("DD")]
 )
+kde_rates = kde_data
+
+# 500 ms
+fret_2cde = compute_fret_2cde(bursts.photon_data, kde_data)
+
 
 # %%
-
-fret_2cde = compute_fret_2cde(bursts.indices, kde_data)
-
-fret_2cde
+burst_photons = bursts.photon_data
+joined_df = burst_photons.join(kde_rates, on=["timestamps"], how="left").filter(
+    pl.col("stream") == pl.col("stream_right")
+)
 
 # %%
 
 fig, axes = plt.subplots(ncols=2)
-axes[0].hist(alex_2cde, bins="fd")
-axes[1].hist(fret_2cde, bins="fd")
+h = axes[0].hist(alex_2cde, bins="fd")
+h = axes[1].hist(fret_2cde, bins="fd")
 # axes[1].axvline(10, color='r')
 # %%
