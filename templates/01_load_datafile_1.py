@@ -12,10 +12,15 @@ ptu_file = "datafile_1.ptu"
 # %%
 photons = PhotonData.from_file(PhotonFile(test_data_dir / ptu_file))
 
-
 # %%
 
 bursts = photons.burst_search("DCBS")
+bursts.burst_data
+
+# %%
+
+bursts = bursts.alex_2cde(photons).fret_2cde(photons)
+
 bursts.burst_data
 
 # %%
