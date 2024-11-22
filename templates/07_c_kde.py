@@ -45,17 +45,15 @@ DD = convolve_stream(photons.data, ["DD"], kernel)
 kde_data = photons.data.select(
     [pl.col("timestamps"), pl.col("stream"), pl.lit(DA).alias("DA"), pl.lit(DD).alias("DD")]
 )
-kde_rates = kde_data
 
 # 500 ms
 fret_2cde = compute_fret_2cde(bursts.photon_data, kde_data)
 
+# modify bursts inplace
+bursts.burst_data = bursts.burst_data.with_columns(pl.lit(fret_2cde).alias("fret_2cde"))
 
 # %%
-burst_photons = bursts.photon_data
-joined_df = burst_photons.join(kde_rates, on=["timestamps"], how="left").filter(
-    pl.col("stream") == pl.col("stream_right")
-)
+
 
 # %%
 
