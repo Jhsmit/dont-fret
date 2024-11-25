@@ -39,7 +39,7 @@ jobs:
           wget "https://filedn.eu/loRXwzWCNnU4XoFPGbllt1y/datafile_1.ptu" -O tests/test_data/input/ds1/datafile_1.ptu
 
       - name: Install in editable mode with test requirements
-        run: uv pip install -e .[test]
+        run: uv pip install -p ${{ matrix.python-version }} -e .[test]
 
       - name: Run tests
         run: |
