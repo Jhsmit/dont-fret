@@ -343,7 +343,7 @@ class BinnedPhotonData:
         return self.time
 
     @property
-    def photon_times(self) -> np.ndarray:
+    def photon_times(self) -> pl.Series:
         """Photon arrival times in this trace, subject to `bounds`"""
         b_arr = np.array(self.bounds) / self.photon_data.timestamps_unit
         bounds_int = np.array([np.floor(b_arr[0]), np.ceil(b_arr[1])]).astype("uint64")
