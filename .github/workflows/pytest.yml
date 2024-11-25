@@ -1,6 +1,10 @@
 name: Testing
 on: [push]
 
+
+env:
+  UV_SYSTEM_PYTHON: 1
+
 jobs:
   test:
     strategy:
