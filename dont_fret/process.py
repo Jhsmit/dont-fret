@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Literal, Optional
@@ -73,13 +74,29 @@ def batch_search_and_save(
 
 
 def full_search(
-    photon_data: PhotonData, burst_colors: list[BurstColor], cfg: DontFRETConfig
+    photon_data: PhotonData, burst_colors: list[BurstColor], hooks: dict = cfg.hooks
 ) -> Bursts:
     """search and alex / fret cde"""
     bursts = photon_data.burst_search(burst_colors)
-    if cfg.web.alex_2cde:
-        bursts = bursts.alex_2cde(photon_data)
-    if cfg.web.fret_2cde:
-        bursts = bursts.fret_2cde(photon_data)
+
+    # Apply hooks
+    for hook_name, hook_params in hooks.items():
+        # Try to import hook from dont_fret/config/hooks.py
+        try:
+            hook = getattr(importlib.import_module("dont_fret.config.hooks"), hook_name)
+        except AttributeError:
+            # If not found, try to import from hooks.py in cwd
+            try:
+                hook = getattr(importlib.import_module("hooks"), hook_name)
+            except (ImportError, AttributeError):
+                raise ValueError(f"Hook '{hook_name}' not found")
+
+        # Apply hook
+        bursts = hook(bursts, photon_data, **hook_params)
+
+    # if cfg.web.alex_2cde:
+    #     bursts = bursts.alex_2cde(photon_data)
+    # if cfg.web.fret_2cde:
+    #     bursts = bursts.fret_2cde(photon_data)
 
     return bursts

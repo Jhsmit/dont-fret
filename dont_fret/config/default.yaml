@@ -34,6 +34,15 @@ burst_search:
       M: 100
       T: 500.e-6
 
+# post-burst search hooks to apply
+# hooks are of the form my_hook(burst_data, photon_data, **kwargs)
+# kwargs are as specified here
+hooks:
+  alex_2cde:
+    tau: 150.e-6 # make sure to format as float
+  fret_2cde:
+    tau: 50.e-6
+
 # settings related to dont-fret's web interface
 web:
   password: null # set to null to disable password protection
