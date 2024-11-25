@@ -42,8 +42,8 @@ def compute_fret_2cde(
 
     matching_indices = np.intersect1d(df_DA["burst_index"].unique(), df_DD["burst_index"].unique())
 
-    DA_groups = {k: v for k, v in df_DA.group_by("burst_index")}
-    DD_groups = {k: v for k, v in df_DD.group_by("burst_index")}
+    DA_groups = {k: v for k, v in df_DA.group_by(["burst_index"])}
+    DD_groups = {k: v for k, v in df_DD.group_by(["burst_index"])}
 
     N: int = burst_photons["burst_index"].max() + 1  # type: ignore
     output = np.full(N, fill_value=np.nan)
