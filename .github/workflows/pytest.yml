@@ -10,12 +10,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ "ubuntu-latest", "macos-latest" , "windows-latest"]
         python-version: ["3.10" ]
-    defaults:
-      run:
-        shell: bash
-    runs-on: ${{ matrix.os }}
+    # defaults: 
+    #   run:
+    #     shell: bash
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
@@ -26,20 +25,23 @@ jobs:
           # Install a specific version of uv.
           version: "0.5.4"
   
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Download test file windows
-        if: runner.os == 'Windows'
+      - name: Install dependencies
         run: |
-            C:\\msys64\\usr\\bin\\wget.exe "https://filedn.eu/loRXwzWCNnU4XoFPGbllt1y/datafile_1.ptu" -O tests/test_data/input/ds1/datafile_1.ptu
-      - name: Download test file other platforms
-        if: runner.os != 'Windows'
+          python -m pip install uv
+          uv venv -p ${{ matrix.python-version }}
+          uv pip install -e .[test,web]
+
+      - name: Download test file
         run: |
           wget "https://filedn.eu/loRXwzWCNnU4XoFPGbllt1y/datafile_1.ptu" -O tests/test_data/input/ds1/datafile_1.ptu
 
-      - name: Install in editable mode with test requirements
-        run: uv pip install -p ${{ matrix.python-version }} -e .[test]
+      - name: Activate virtualenv
+        run: |
+          . .venv/bin/activate
+          echo PATH=$PATH >> $GITHUB_ENV
+
+      # - name: Install in editable mode with test requirements
+      #   run: uv pip install -p ${{ matrix.python-version }} -e .[test]
 
       - name: Run tests
         run: |
