@@ -463,13 +463,24 @@ class Bursts:
         if self.cfg is not None:
             self.cfg.to_yaml(directory / "config.yaml")
 
-    def fret_2cde(self, photons: PhotonData, tau: float = 50e-6) -> Bursts:
+    def fret_2cde(
+        self,
+        photons: PhotonData,
+        tau: float = 50e-6,
+        dem_stream: str = "DD",
+        aem_stream: str = "DA",
+    ) -> Bursts:
         assert photons.timestamps_unit
         kernel = make_kernel(tau, photons.timestamps_unit)
-        DA = convolve_stream(photons.data, ["DA"], kernel)
-        DD = convolve_stream(photons.data, ["DD"], kernel)
+        acceptor_em_rates = convolve_stream(photons.data, [dem_stream], kernel)
+        donor_em_rates = convolve_stream(photons.data, [aem_stream], kernel)
         kde_data = photons.data.select(
-            [pl.col("timestamps"), pl.col("stream"), pl.lit(DA).alias("DA"), pl.lit(DD).alias("DD")]
+            [
+                pl.col("timestamps"),
+                pl.col("stream"),
+                pl.lit(acceptor_em_rates).alias("A_em"),
+                pl.lit(donor_em_rates).alias("D_em"),
+            ]
         )
 
         fret_2cde = compute_fret_2cde(self.photon_data, kde_data)
@@ -477,18 +488,27 @@ class Bursts:
 
         return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
 
-    def alex_2cde(self, photons: PhotonData, tau: float = 50e-6) -> Bursts:
+    def alex_2cde(
+        self,
+        photons: PhotonData,
+        tau: float = 50e-6,
+        dex_streams: Optional[list[str]] = None,
+        aex_streams: Optional[list[str]] = None,
+    ) -> Bursts:
+        dex_streams = dex_streams if dex_streams else ["DD", "DA"]
+        aex_streams = aex_streams if aex_streams else ["AA"]
+
         assert photons.timestamps_unit
         kernel = make_kernel(tau, photons.timestamps_unit)
-        D_ex = convolve_stream(photons.data, ["DD", "DA"], kernel)
-        A_ex = convolve_stream(photons.data, ["AA"], kernel)  # crashed the kernel (sometimes)
+        donor_ex_rates = convolve_stream(photons.data, dex_streams, kernel)
+        acceptor_ex_rates = convolve_stream(photons.data, aex_streams, kernel)
 
         kde_data = photons.data.select(
             [
                 pl.col("timestamps"),
                 pl.col("stream"),
-                pl.lit(D_ex).alias("D_ex"),
-                pl.lit(A_ex).alias("A_ex"),
+                pl.lit(donor_ex_rates).alias("D_ex"),
+                pl.lit(acceptor_ex_rates).alias("A_ex"),
             ]
         )
 
