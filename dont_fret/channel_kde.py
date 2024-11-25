@@ -68,60 +68,6 @@ def compute_fret_2cde(
     return output
 
 
-def compute_fret_2cde_v1(
-    indices: pl.DataFrame,
-    kde_rates,
-    # TODO channel names
-) -> np.ndarray:
-    output = np.empty(len(indices), dtype=float)
-
-    f_DA = pl.col("stream") == "DA"
-    f_DD = pl.col("stream") == "DD"
-
-    for idx, (imin, imax) in enumerate(indices.iter_rows()):
-        # df = kde_rates[imin:imax+1] # this is slower
-        df = kde_rates.slice(imin, imax - imin + 1)
-
-        # filtering like this is also slower
-        df_f_DA = df.filter(f_DA)  # select only the DA photons, thus these are for KDE^X_DA
-        df_f_DD = df.filter(f_DD)  # KDE^X_DD (density of ch X at DD timestamps)
-
-        kde_DA_DA = df_f_DA["DA"]  # select DA density - kde^DA_DA
-        kde_DA_DD = df_f_DD["DA"]  # kde^DA_DD (in the paper called kde^A_D)
-        kde_DD_DD = df_f_DD["DD"]  # kde^DD_DD
-        kde_DD_DA = df_f_DA["DD"]  # kde^DD_DA
-
-        # bools_DA = df["stream"] == "DA"
-        # bools_DD = df["stream"] == "DD"
-
-        # kde_DA_DA = df["DA"].filter(bools_DA)  # select DA density - kde^DA_DA
-        # kde_DA_DD = df["DA"].filter(bools_DD)  # kde^DA_DD (in the paper called kde^A_D)
-        # kde_DD_DD = df["DD"].filter(bools_DD)  # kde^DD_DD
-        # kde_DD_DA = df["DD"].filter(bools_DA)  # kde^DD_DA
-
-        try:
-            nbkde_DA_DA = (1 + 2 / len(kde_DA_DA)) * (kde_DA_DA - 1)
-            nbkde_DD_DD = (1 + 2 / len(kde_DD_DD)) * (kde_DD_DD - 1)
-
-            # ED = (kde_DA_DD / (kde_DA_DD + nbkde_DD_DD)).sum() / nbkde_DD_DD.count()
-            # EA = (kde_DD_DA / (kde_DD_DA + nbkde_DA_DA)).sum() / nbkde_DA_DA.count() # = (1 - E)_A
-
-            # when denom is zero, it doesnt count towards number of photons
-            # see "Such cases are removed by the computer algorithm", in Tomov et al.
-            denom = kde_DA_DD + nbkde_DD_DD
-            ED = (kde_DA_DD / denom).sum() / (denom != 0.0).sum()  # when
-
-            denom = kde_DD_DA + nbkde_DA_DA
-            EA = (kde_DD_DA / denom).sum() / (denom != 0.0).sum()  # = (1 - E)_A
-
-            fret_cde = 110 - 100 * (ED + EA)
-            output[idx] = fret_cde
-        except ZeroDivisionError:
-            output[idx] = np.nan
-
-    return output
-
-
 # refactor to indices / loop
 def compute_alex_2cde(
     burst_photons: pl.DataFrame,
