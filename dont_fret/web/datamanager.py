@@ -78,7 +78,7 @@ class ThreadedDataManager:
 
             try:
                 photon_data = await self.get_photons(photon_node)
-                bursts = await self.run(full_search, photon_data, burst_colors, self.cfg)
+                bursts = await self.run(full_search, photon_data, burst_colors, self.cfg.hooks)
 
                 future.set_result(bursts)
             except Exception as e:
