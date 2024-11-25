@@ -91,12 +91,6 @@ def full_search(
             except (ImportError, AttributeError):
                 raise ValueError(f"Hook '{hook_name}' not found")
 
-        # Apply hook
         bursts = hook(bursts, photon_data, **hook_params)
-
-    # if cfg.web.alex_2cde:
-    #     bursts = bursts.alex_2cde(photon_data)
-    # if cfg.web.fret_2cde:
-    #     bursts = bursts.fret_2cde(photon_data)
 
     return bursts

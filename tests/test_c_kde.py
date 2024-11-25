@@ -2,15 +2,12 @@
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import polars.testing as pl_test
 import pytest
 
 from dont_fret.channel_kde import compute_alex_2cde, compute_fret_2cde, convolve_stream, make_kernel
-from dont_fret.fileIO import PhotonFile
-from dont_fret.models import PhotonData
 
 cwd = Path(__file__).parent
 input_data_dir = cwd / "test_data" / "input"

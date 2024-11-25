@@ -164,10 +164,6 @@ def convolve_stream(data: pl.DataFrame, streams: list[str], kernel: np.ndarray) 
     # dataframes read from .pq cannot be converted zero-copy
     event_times = df["timestamps"].to_numpy(allow_copy=True)
     eval_times = data["timestamps"].to_numpy(allow_copy=True)
-
-    # event_times = np.array(df["timestamps"])
-    # eval_times = np.array(data["timestamps"])
-
     return async_convolve(event_times, eval_times, kernel)
 
 
@@ -177,7 +173,7 @@ def convolve_stream(data: pl.DataFrame, streams: list[str], kernel: np.ndarray) 
         types.Array(int64, 1, "C", readonly=True),
         types.Array(float64, 1, "C", readonly=True),
     ),
-    nopython=False,
+    nopython=True,
     nogil=True,
 )
 def async_convolve(event_times, eval_times, kernel):
