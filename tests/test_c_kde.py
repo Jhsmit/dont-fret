@@ -40,10 +40,15 @@ def burst_data() -> pl.DataFrame:
 
 def test_compare_fret_cde_fretbursts(burst_data):
     kernel = make_kernel(tau, TIMESTAMPS_UNIT)
-    DA = convolve_stream(photon_data, ["DA"], kernel)
-    DD = convolve_stream(photon_data, ["DD"], kernel)
+    A_em = convolve_stream(photon_data, ["DA"], kernel)
+    D_em = convolve_stream(photon_data, ["DD"], kernel)
     kde_data = photon_data.select(
-        [pl.col("timestamps"), pl.col("stream"), pl.lit(DA).alias("DA"), pl.lit(DD).alias("DD")]
+        [
+            pl.col("timestamps"),
+            pl.col("stream"),
+            pl.lit(A_em).alias("A_em"),
+            pl.lit(D_em).alias("D_em"),
+        ]
     )
 
     fret_2cde = compute_fret_2cde(burst_data, kde_data)

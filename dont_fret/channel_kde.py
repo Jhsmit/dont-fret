@@ -22,14 +22,21 @@ from dont_fret.expr import is_in_expr
 def compute_fret_2cde(
     burst_photons: pl.DataFrame,
     kde_rates: pl.DataFrame,
-    # channels
+    dem_stream: str = "DD",
+    aem_stream: str = "DA",
 ) -> np.ndarray:
+    """
+    burst_photons: Dataframe with columns: timestamps, stream, burst_index
+    kde_rates: Dataframe with columns: timestamps, D_em, A_em.
+    dem_stream: photon stream which is donor emission (default: DD)
+    aem_stream: photon stream which is acceptor emission (default: DA)
+    """
     joined_df = burst_photons.join(kde_rates, on=["timestamps"], how="left").filter(
         pl.col("stream") == pl.col("stream_right")
     )
 
-    f_DA = pl.col("stream") == "DA"
-    f_DD = pl.col("stream") == "DD"
+    f_DA = pl.col("stream") == aem_stream
+    f_DD = pl.col("stream") == dem_stream
     df_DA = joined_df.filter(f_DA)
     df_DD = joined_df.filter(f_DD)
 
@@ -44,10 +51,10 @@ def compute_fret_2cde(
         df_DA_j = DA_groups[(j,)]
         df_DD_j = DD_groups[(j,)]
 
-        kde_DA_DA = df_DA_j["DA"].to_numpy()  # select DA density - kde^DA_DA
-        kde_DA_DD = df_DD_j["DA"].to_numpy()  # kde^DA_DD (in the paper called kde^A_D)
-        kde_DD_DD = df_DD_j["DD"].to_numpy()  # kde^DD_DD
-        kde_DD_DA = df_DA_j["DD"].to_numpy()  # kde^DD_DA
+        kde_DA_DA = df_DA_j["A_em"].to_numpy()  # select DA density - kde^DA_DA
+        kde_DA_DD = df_DD_j["A_em"].to_numpy()  # kde^DA_DD (in the paper called kde^A_D)
+        kde_DD_DD = df_DD_j["D_em"].to_numpy()  # kde^DD_DD
+        kde_DD_DA = df_DA_j["D_em"].to_numpy()  # kde^DD_DA
 
         try:
             nbkde_DA_DA = (1 + 2 / len(kde_DA_DA)) * (kde_DA_DA - 1)
@@ -91,9 +98,6 @@ def compute_alex_2cde(
     # joined_df = burst_photons.join(kde_rates, on=['timestamps', 'stream'], how='inner')
     # still, this is the slowest step. would be nice if we can improve since we know the indices
 
-    # remove comments after passing test:
-    # j1 = burst_photons.join(kde_rates, on=["timestamps"], how="left")
-    # joined_df = j1.filter(pl.col("stream") == pl.col("stream_right"))
     joined_df = burst_photons.join(kde_rates, on=["timestamps"], how="left").filter(
         pl.col("stream") == pl.col("stream_right")
     )
