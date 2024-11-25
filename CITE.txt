@@ -15,3 +15,7 @@ https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4805879/
 burst search:
 "Data registration and selective single-molecule analysis using multi-parameter fluorescence detection"
 DOI: 10.1016/S0168-1656(00)00412-0
+
+fret/alex cde:
+"Disentangling Subpopulations in Single-Molecule FRET and ALEX Experiments with Photon Distribution Analysis"
+https://doi.org/10.1016/j.bpj.2011.11.4025
