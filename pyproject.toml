@@ -32,7 +32,8 @@ dependencies = [
     "plotly",
     "altair",
     "anywidget",
-    "vegafusion[embed]"
+    "vegafusion[embed]",
+    "vl-convert-python",
 ]
 dynamic = ["version"]
 
