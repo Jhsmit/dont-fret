@@ -72,7 +72,7 @@ async def test_burst_search():
     assert new_node.bursts
     burst_item = new_node.bursts[0]
     assert burst_item.name == "DCBS"
-    assert burst_item.df.shape == (72, 22)
+    assert burst_item.df.shape == (72, 24)
     assert burst_item.df["filename"].unique()[0] == "datafile_1.ptu"
 
     await asyncio.sleep(0)

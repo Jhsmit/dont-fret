@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import polars as pl
 import yaml
@@ -43,10 +43,14 @@ class BurstFilterItem:
 class Web:
     """settings related to web application"""
 
-    default_dir: Path
+    default_dir: Path = field(default_factory=Path)
     protect_filebrowser: bool = True
     burst_filters: list[BurstFilterItem] = field(default_factory=list)
     password: Optional[str] = None
+
+    # todo configurable settings
+    fret_2cde: bool = True  # calculate fret_2cde after burst search with default settings
+    alex_2cde: bool = True
 
 
 @dataclass
@@ -62,7 +66,8 @@ class DontFRETConfig:
     channels: dict[str, Channel]
     streams: dict[str, list[str]]
     burst_search: dict[str, list[BurstColor]]
-    web: Web
+    hooks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    web: Web = field(default_factory=Web)
 
     @classmethod
     def from_dict(cls, data: Data):

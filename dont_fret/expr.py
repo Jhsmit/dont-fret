@@ -32,6 +32,17 @@ def reduce_or(exprs: list[pl.Expr]) -> pl.Expr:
     return reduce(or_, exprs)
 
 
+def is_in_expr(field: str, values: list) -> pl.Expr:
+    """generate an polars expression equivalent to pl.col(field).is_in(values) by chaining equal
+    and or operations together
+
+    this is (sometimes?) faster to execute
+    """
+
+    exprs = [pl.col(field) == value for value in values]
+    return reduce_or(exprs)
+
+
 def parse_yaml_expressions(yaml_content: str) -> Dict[str, pl.Expr]:
     yaml_data = yaml.safe_load(yaml_content)
     return {key: parse_expression(value).alias(key) for key, value in yaml_data.items()}

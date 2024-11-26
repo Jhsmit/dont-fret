@@ -39,31 +39,6 @@ CMAP = px.colors.sequential.Viridis
 WRATIO = 3.5
 
 DEFAULT_FIELD = "n_photons"
-# TODO this is hardcoded but it depends on cfg settings what fields burst item dataframes have
-# -> deduce from selection
-FIELD_OPTIONS = [
-    "burst_index",
-    "n_DD",
-    "n_DA",
-    "n_AA",
-    "n_AD",
-    "nanotimes_DD",
-    "nanotimes_DA",
-    "nanotimes_AA",
-    "nanotimes_AD",
-    "timestamps_mean",
-    "timestamps_min",
-    "timestamps_max",
-    "E_app",
-    "S_app",
-    "n_photons",
-    "time_mean",
-    "time_length",
-    "tau_DD",
-    "tau_DA",
-    "tau_AA",
-    "tau_AD",
-]
 
 
 def fd_bin_width(data: pl.Series) -> float:
@@ -209,6 +184,9 @@ def FilterEditDialog():
     )
     levels = list(selectors)
     burst_node = get_bursts(state.fret_nodes.items, burst_node_choice.items)
+    field_options = [
+        col for col, dtype in zip(burst_node.df.columns, burst_node.df.dtypes) if dtype.is_numeric()
+    ]
 
     def make_chart():
         new_chart = make_overlay_chart(burst_node.df, field.value, state.filters.items)
@@ -262,7 +240,7 @@ def FilterEditDialog():
                     field.set(value)
 
                 solara.Select(
-                    label="Field", value=field.value, values=FIELD_OPTIONS, on_value=on_field
+                    label="Field", value=field.value, values=field_options, on_value=on_field
                 )
                 with solara.Tooltip("Add or edit filter"):
                     solara.IconButton("mdi-filter-plus", on_click=filter_from_selection)

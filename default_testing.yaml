@@ -40,6 +40,12 @@ burst_search:
       M: 100
       T: 500.e-6
 
+hooks:
+  alex_2cde:
+    tau: 50.e-6 # make sure to format as float
+  fret_2cde:
+    tau: 50.e-6
+
 # settings related to dont-fret's web interface
 web:
   password: null
@@ -48,3 +54,5 @@ web:
   burst_filters: # default filters to apply to burst search filters
     - name: n_photons
       min: 150
+    - name: alex_2cde
+      max: 100

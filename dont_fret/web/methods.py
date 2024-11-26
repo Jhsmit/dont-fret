@@ -4,7 +4,7 @@ import itertools
 import math
 from functools import reduce
 from operator import and_
-from typing import Literal, Optional, TypedDict, Union
+from typing import Any, Literal, Optional, TypedDict, Union
 
 import altair as alt
 import numpy as np
@@ -15,6 +15,7 @@ import solara.lab
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
+from dont_fret.process import process_photon_data
 from dont_fret.web.models import BurstFilterItem, BurstNode, FRETNode, PhotonNode
 
 
@@ -45,14 +46,25 @@ def make_burst_dataframe(
         return concat
 
 
+# hooks?
 def make_burst_nodes(
-    photon_nodes: list[PhotonNode], burst_settings: dict[str, list[BurstColor]]
+    photon_nodes: list[PhotonNode],
+    burst_settings: dict[str, list[BurstColor]],
+    hooks: Optional[dict[str, dict[str, Any]]] = None,
 ) -> list[BurstNode]:
     photons = [PhotonData.from_file(PhotonFile(node.file_path)) for node in photon_nodes]
     burst_nodes = []
     # todo tqdm?
+
+    hooks = hooks or {}
     for name, burst_colors in burst_settings.items():
-        bursts = [photons.burst_search(burst_colors) for photons in photons]
+        bursts = [process_photon_data(photon_data, burst_colors, hooks) for photon_data in photons]
+        # bursts = [photons.burst_search(burst_colors) for photons in photons]
+        # if alex_2cde:
+        #     bursts = [b.alex_2cde(photons) for b, photons in zip(bursts, photons)]
+        # if fret_2cde:
+        #     bursts = [b.fret_2cde(photons) for b, photons in zip(bursts, photons)]
+
         infos = [get_info(photons) for photons in photons]
         duration = get_duration(infos)
         df = make_burst_dataframe(bursts, names=[node.name for node in photon_nodes])

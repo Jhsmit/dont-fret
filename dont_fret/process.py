@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Literal, Optional
@@ -8,8 +9,9 @@ import polars as pl
 from tqdm.auto import tqdm
 
 from dont_fret.config import cfg
+from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
-from dont_fret.models import PhotonData
+from dont_fret.models import Bursts, PhotonData
 
 
 def search_and_save(
@@ -69,3 +71,23 @@ def batch_search_and_save(
 
         for f in tqdm(as_completed(futures), total=len(futures)):
             f.result()
+
+
+def process_photon_data(
+    photon_data: PhotonData, burst_colors: list[BurstColor], hooks: dict = cfg.hooks
+) -> Bursts:
+    """search and apply hooks"""
+    bursts = photon_data.burst_search(burst_colors)
+
+    for hook_name, hook_params in hooks.items():
+        try:
+            hook = getattr(importlib.import_module("dont_fret.config.hooks"), hook_name)
+        except AttributeError:
+            try:
+                hook = getattr(importlib.import_module("hooks"), hook_name)
+            except (ImportError, AttributeError):
+                raise ValueError(f"Hook '{hook_name}' not found")
+
+        bursts = hook(bursts, photon_data, **hook_params)
+
+    return bursts

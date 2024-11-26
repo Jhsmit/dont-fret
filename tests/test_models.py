@@ -8,6 +8,7 @@ import pytest
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import BinnedPhotonData, Bursts, PhotonData
+from dont_fret.process import process_photon_data
 
 cwd = Path(__file__).parent
 input_data_dir = cwd / "test_data" / "input"
@@ -80,6 +81,8 @@ def test_load_save_bursts(dcbs_bursts: Bursts, tmp_path: Path):
     assert dcbs_bursts.burst_data.equals(bursts_load.burst_data)
     assert dcbs_bursts.photon_data.equals(bursts_load.photon_data)
     assert dcbs_bursts.cfg == bursts_load.cfg
+    assert dcbs_bursts.cfg
+    assert bursts_load.cfg
     assert asdict(dcbs_bursts.cfg) == asdict(bursts_load.cfg)
     assert dcbs_bursts.metadata == bursts_load.metadata
 
@@ -107,6 +110,17 @@ def test_burst_search(ph_ds1: PhotonData):
         assert (df_ref["time_length"] == time_length).all()
         assert (df_ref["time_min"] == df_test["timestamps_min"] * ph_ds1.timestamps_unit).all()
         assert (df_ref["time_max"] == df_test["timestamps_max"] * ph_ds1.timestamps_unit).all()
+
+
+def test_process_photon_data(ph_ds1: PhotonData):
+    hooks = {
+        "alex_2cde": {},
+        "fret_2cde": {},
+    }
+
+    bursts = process_photon_data(ph_ds1, APBS_TEST, hooks=hooks)
+    assert "alex_2cde" in bursts.burst_data.columns
+    assert "fret_2cde" in bursts.burst_data.columns
 
 
 def test_binning(ph_ds1):
