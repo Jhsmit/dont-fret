@@ -14,7 +14,7 @@ from typing import (
 from dont_fret.config.config import BurstColor, DontFRETConfig, cfg
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
-from dont_fret.process import full_search
+from dont_fret.process import process_photon_data
 from dont_fret.web.methods import get_duration, get_info, make_burst_dataframe
 from dont_fret.web.models import BurstNode, PhotonNode
 
@@ -78,7 +78,9 @@ class ThreadedDataManager:
 
             try:
                 photon_data = await self.get_photons(photon_node)
-                bursts = await self.run(full_search, photon_data, burst_colors, self.cfg.hooks)
+                bursts = await self.run(
+                    process_photon_data, photon_data, burst_colors, self.cfg.hooks
+                )
 
                 future.set_result(bursts)
             except Exception as e:

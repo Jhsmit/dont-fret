@@ -9,7 +9,7 @@ import polars as pl
 from tqdm.auto import tqdm
 
 from dont_fret.config import cfg
-from dont_fret.config.config import BurstColor, DontFRETConfig
+from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
 
@@ -73,10 +73,10 @@ def batch_search_and_save(
             f.result()
 
 
-def full_search(
+def process_photon_data(
     photon_data: PhotonData, burst_colors: list[BurstColor], hooks: dict = cfg.hooks
 ) -> Bursts:
-    """search and alex / fret cde"""
+    """search and apply hooks"""
     bursts = photon_data.burst_search(burst_colors)
 
     # Apply hooks
