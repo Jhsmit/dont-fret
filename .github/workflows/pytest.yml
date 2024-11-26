@@ -22,7 +22,7 @@ jobs:
         run: |
           python -m pip install uv
           uv venv -p ${{ matrix.python-version }}
-          . .venv/bin/activate'
+          . .venv/bin/activate
           echo PATH=$PATH >> $GITHUB_ENV
           uv pip install -r requirements/requirements-ubuntu-latest-${{ matrix.python-version }}.txt
           uv pip install -e .
