@@ -32,6 +32,7 @@ from dont_fret.web.utils import (
     find_object,
     get_bursts,
     make_selector_nodes,
+    order_columns,
 )
 
 N_STEP = 1000  # number slider steps
@@ -184,9 +185,13 @@ def FilterEditDialog():
     )
     levels = list(selectors)
     burst_node = get_bursts(state.fret_nodes.items, burst_node_choice.items)
-    field_options = [
-        col for col, dtype in zip(burst_node.df.columns, burst_node.df.dtypes) if dtype.is_numeric()
-    ]
+    field_options = order_columns(
+        [
+            col
+            for col, dtype in zip(burst_node.df.columns, burst_node.df.dtypes)
+            if dtype.is_numeric()
+        ]
+    )
 
     def make_chart():
         new_chart = make_overlay_chart(burst_node.df, field.value, state.filters.items)
@@ -265,7 +270,7 @@ def PlotSettingsEditDialog(
 ):
     copy = solara.use_reactive(plot_settings.value)
     img, set_img = solara.use_state(cast(Optional[BinnedImage], None))
-    items = list(df.columns)
+    items = order_columns(df.columns)
 
     drop_cols = ["filename", "burst_index"]
     for col in drop_cols:
@@ -281,7 +286,10 @@ def PlotSettingsEditDialog(
             update = {f"{axis}_min": 0.0, f"{axis}_max": 1.0}
         elif field.startswith("time") and duration is not None:
             update = {f"{axis}_min": 0.0, f"{axis}_max": duration}
-        # elif field in time .. (autolimit to 0, aquisition duration)
+        elif field == "alex_2cde":
+            update = {f"{axis}_min": 0.0, f"{axis}_max": 40}
+        elif field == "fret_2cde":
+            update = {f"{axis}_min": -10, f"{axis}_max": 40}
         else:
             update = {f"{axis}_min": df[field].min(), f"{axis}_max": df[field].max()}
         copy.update(**update)
