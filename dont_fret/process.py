@@ -79,13 +79,10 @@ def process_photon_data(
     """search and apply hooks"""
     bursts = photon_data.burst_search(burst_colors)
 
-    # Apply hooks
     for hook_name, hook_params in hooks.items():
-        # Try to import hook from dont_fret/config/hooks.py
         try:
             hook = getattr(importlib.import_module("dont_fret.config.hooks"), hook_name)
         except AttributeError:
-            # If not found, try to import from hooks.py in cwd
             try:
                 hook = getattr(importlib.import_module("hooks"), hook_name)
             except (ImportError, AttributeError):
