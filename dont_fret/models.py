@@ -470,6 +470,10 @@ class Bursts:
         dem_stream: str = "DD",
         aem_stream: str = "DA",
     ) -> Bursts:
+        if self.burst_data.is_empty():
+            burst_data = self.burst_data.with_columns(pl.lit(None).alias("fret_2cde"))
+            return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
+
         assert photons.timestamps_unit
         kernel = make_kernel(tau, photons.timestamps_unit)
         acceptor_em_rates = convolve_stream(photons.data, [dem_stream], kernel)
@@ -495,6 +499,10 @@ class Bursts:
         dex_streams: Optional[list[str]] = None,
         aex_streams: Optional[list[str]] = None,
     ) -> Bursts:
+        if self.burst_data.is_empty():
+            burst_data = self.burst_data.with_columns(pl.lit(None).alias("alex_2cde"))
+            return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
+
         dex_streams = dex_streams if dex_streams else ["DD", "DA"]
         aex_streams = aex_streams if aex_streams else ["AA"]
 
