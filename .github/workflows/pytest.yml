@@ -17,6 +17,8 @@ jobs:
         with:
           # Install a specific version of uv.
           version: "0.5.4"
+          enable-cache: true
+          cache-dependency-glob: requirements/requirements-ubuntu-latest-${{ matrix.python-version }}.txt
   
       - name: Install dependencies
         run: |
