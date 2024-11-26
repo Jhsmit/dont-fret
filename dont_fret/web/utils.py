@@ -2,12 +2,29 @@ import time
 import uuid
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, TypeVar
+from typing import Any, Callable, Dict, Iterator, Literal, Optional, TypeVar
 
 from dont_fret.web.models import BurstNode, FRETNode, ListStore, PhotonNode, SelectorNode
 
 T = TypeVar("T")
 V = TypeVar("V")
+
+PREFERED_ORDER = [
+    "n_photons",
+    "E_app",
+    "S_app",
+    "time_mean",
+    "time_length",
+    "alex_2cde",
+    "fret_2cde",
+]
+
+
+def order_columns(columns: list[str], prefered_order: Optional[list[str]] = None) -> list[str]:
+    prefered_order = prefered_order if prefered_order is not None else PREFERED_ORDER
+    return [c for c in prefered_order if c in columns] + [
+        c for c in columns if c not in prefered_order
+    ]
 
 
 # TODO 1) it should be able not to take any args at all
@@ -113,9 +130,9 @@ def has_bursts(nodes: list[FRETNode]) -> bool:
 
 @dataclass
 class NestedSelectors:
-    nodes: List[SelectorNode]
+    nodes: list[SelectorNode]
     selection: ListStore[str]
-    labels: Optional[List[str]]
+    labels: Optional[list[str]]
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
         stack = self.nodes
