@@ -12,7 +12,7 @@ import yaml
 import dont_fret.web.state as state
 from dont_fret.config import cfg
 from dont_fret.web.bursts import BurstPage
-from dont_fret.web.components import Snackbar
+from dont_fret.web.components import FRETStyle, Snackbar
 from dont_fret.web.home import HomePage
 from dont_fret.web.methods import use_dark_altair
 from dont_fret.web.models import BurstColorList
@@ -67,7 +67,7 @@ def Page():
     login_failed = solara.use_reactive(False)
     password = solara.use_reactive("")
 
-    solara.Style(SCRIPT_PATH / "style.css")
+    FRETStyle()
     use_dark_altair()
 
     def initialize():
