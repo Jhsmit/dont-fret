@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Callable, Optional, Type
 
 import solara
@@ -8,6 +9,11 @@ import solara.lab
 from solara.alias import rv
 
 import dont_fret.web.state as state
+
+
+@solara.component
+def FRETStyle():
+    solara.Style(Path(__file__).parent / "style.css")
 
 
 @solara.component
