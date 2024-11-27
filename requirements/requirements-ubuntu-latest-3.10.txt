@@ -308,7 +308,7 @@ pytest-base-url==2.1.0
     # via pytest-playwright
 pytest-ipywidgets==1.41.0
     # via dont-fret (pyproject.toml)
-pytest-playwright==0.6.1
+pytest-playwright==0.6.2
     # via
     #   dont-fret (pyproject.toml)
     #   pytest-ipywidgets
@@ -423,6 +423,8 @@ urllib3==2.2.3
 uvicorn==0.32.1
     # via solara-server
 vegafusion==2.0.1
+    # via dont-fret (pyproject.toml)
+vl-convert-python==1.7.0
     # via dont-fret (pyproject.toml)
 watchdog==6.0.0
     # via
