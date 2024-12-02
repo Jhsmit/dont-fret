@@ -383,7 +383,7 @@ class Bursts:
         metadata: Optional[dict] = None,
         cfg: DontFRETConfig = global_cfg,
     ) -> Bursts:
-        # todo move to classmethod
+        # implement as hooks
 
         # number of photons per stream per burst
         agg = [(pl.col("stream") == stream).sum().alias(f"n_{stream}") for stream in cfg.streams]
@@ -403,7 +403,20 @@ class Bursts:
         agg.append(pl.col("timestamps").min().alias("timestamps_min"))
         agg.append(pl.col("timestamps").max().alias("timestamps_max"))
 
-        # TODO as yaml in config
+        t_unit = metadata.get("timestamps_unit", None)
+        if t_unit is not None:
+            acceptor_streams = ["DA", "AA"]
+            donor_streams = ["DD"]
+
+            ts_acceptor = (
+                pl.col("timestamps").filter(pl.col("stream").is_in(acceptor_streams)).mean()
+            )
+            ts_donor = pl.col("timestamps").filter(pl.col("stream").is_in(donor_streams)).mean()
+            asymmetry = ((ts_acceptor - ts_donor) * t_unit).alias("asymmetry")
+
+            agg.append(asymmetry)
+
+        # TODO configure via hooks
         columns = [
             (pl.col("n_DA") / (pl.col("n_DD") + pl.col("n_DA"))).alias("E_app"),
             (
@@ -413,9 +426,7 @@ class Bursts:
             photon_data["burst_index"].unique_counts().alias("n_photons"),
         ]
 
-        # TODO These should move somewhere else; possibly some second step conversion
-        # from raw stamps to times
-        t_unit = metadata.get("timestamps_unit", None)
+        # yaml config via eval?
         if t_unit is not None:
             columns.extend(
                 [
