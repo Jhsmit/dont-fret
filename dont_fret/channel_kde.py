@@ -7,6 +7,9 @@ https://doi.org/10.1016/j.bpj.2011.11.4025
 
 Please cite the paper when using this module.
 
+See also:
+https://nbviewer.org/github/OpenSMFS/FRETBursts_notebooks/blob/master/notebooks/Example%20-%202CDE%20Method.ipynb
+
 """
 
 import warnings
