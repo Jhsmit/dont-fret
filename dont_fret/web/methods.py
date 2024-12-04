@@ -46,24 +46,23 @@ def make_burst_dataframe(
         return concat
 
 
-# hooks?
 def make_burst_nodes(
     photon_nodes: list[PhotonNode],
     burst_settings: dict[str, list[BurstColor]],
-    hooks: Optional[dict[str, dict[str, Any]]] = None,
+    aggregations: Optional[dict] = None,
+    transforms: Optional[dict] = None,
 ) -> list[BurstNode]:
     photons = [PhotonData.from_file(PhotonFile(node.file_path)) for node in photon_nodes]
     burst_nodes = []
     # todo tqdm?
 
-    hooks = hooks or {}
     for name, burst_colors in burst_settings.items():
-        bursts = [process_photon_data(photon_data, burst_colors, hooks) for photon_data in photons]
-        # bursts = [photons.burst_search(burst_colors) for photons in photons]
-        # if alex_2cde:
-        #     bursts = [b.alex_2cde(photons) for b, photons in zip(bursts, photons)]
-        # if fret_2cde:
-        #     bursts = [b.fret_2cde(photons) for b, photons in zip(bursts, photons)]
+        bursts = [
+            process_photon_data(
+                photon_data, burst_colors, aggregations=aggregations, transforms=transforms
+            )
+            for photon_data in photons
+        ]
 
         infos = [get_info(photons) for photons in photons]
         duration = get_duration(infos)

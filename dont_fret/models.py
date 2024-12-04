@@ -23,14 +23,6 @@ if TYPE_CHECKING:
 class PhotonData:
     """Base object for timestamp data
 
-
-    does not have identified channels
-    and access the structured array with properties
-
-    timestamps: ndarray int timestamps (global resolution)
-    detectors: ndarray int
-    nanotimes, optional: ndarray int
-
     metadata: dict; whatever contents
     """
 
@@ -201,7 +193,7 @@ class PhotonData:
         """write to photon-hdf5 file"""
         ...
 
-    def burst_search(self, colors: Union[str, list[BurstColor]]) -> Bursts:
+    def burst_search(self, colors: Union[str, list[BurstColor]]) -> pl.DataFrame:
         """
         Search for bursts in the photon data.
 
@@ -260,14 +252,14 @@ class PhotonData:
 
             if len(final_times) == 0:  # No overlap found
                 burst_photons = pl.DataFrame({k: [] for k in self.data.columns + ["burst_index"]})
-                indices = pl.DataFrame({"imin": [], "imax": []})
+                # indices = pl.DataFrame({"imin": [], "imax": []})
             else:
                 tmin, tmax = np.array(final_times).T
 
                 # Convert back to indices
                 imin = np.searchsorted(self.timestamps, tmin)
                 imax = np.searchsorted(self.timestamps, tmax)
-                indices = pl.DataFrame({"imin": imin, "imax": imax})
+                # indices = pl.DataFrame({"imin": imin, "imax": imax})
                 # take all photons (up to and including? edges need to be checked!)
                 b_num = int(2 ** np.ceil(np.log2((np.log2(len(imin))))))
                 index_dtype = getattr(pl, f"UInt{b_num}", pl.Int32)
@@ -279,9 +271,7 @@ class PhotonData:
                 ]
                 burst_photons = pl.concat(bursts)
 
-        bs = Bursts.from_photons(burst_photons, metadata=self.metadata)
-
-        return bs
+        return burst_photons
 
 
 class BinnedPhotonData:
@@ -377,25 +367,57 @@ class Bursts:
     cfg: Optional[DontFRETConfig] = None
 
     @classmethod
+    def from_photons_new(
+        cls,
+        photon_data: pl.DataFrame,
+        agg: list[pl.Expr],
+        with_columns: list[pl.Expr] = [],
+        drop_columns: list[str] = [],
+        metadata: Optional[dict] = None,
+        cfg: DontFRETConfig = global_cfg,
+    ) -> Bursts:
+        raise DeprecationWarning()
+        burst_data = (
+            photon_data.group_by("burst_index", maintain_order=True)
+            .agg(agg)
+            .with_columns(with_columns)
+            .drop(drop_columns)
+        )
+
+        return cls(burst_data, photon_data, metadata, cfg)
+
+    @classmethod
     def from_photons(
         cls,
         photon_data: pl.DataFrame,
         metadata: Optional[dict] = None,
         cfg: DontFRETConfig = global_cfg,
     ) -> Bursts:
+        raise DeprecationWarning()
         # implement as hooks
 
         # number of photons per stream per burst
         agg = [(pl.col("stream") == stream).sum().alias(f"n_{stream}") for stream in cfg.streams]
 
         # mean nanotimes per stream per burst
+        # agg.extend(
+        #     [
+        #         pl.when(pl.col("stream") == k)
+        #         .then(pl.col("nanotimes"))
+        #         .mean()
+        #         .alias(f"nanotimes_{k}")
+        #         for k in cfg.streams
+        #     ]
+        # )
+
+        # this is the same as the whenthen above
         agg.extend(
             [
-                pl.when(pl.col("stream") == k)
-                .then(pl.col("nanotimes"))
+                pl.col("nanotimes")
+                .filter(pl.col("stream") == stream)
                 .mean()
-                .alias(f"nanotimes_{k}")
-                for k in cfg.streams
+                .alias(f"nanotimes_{stream}")
+                for stream in cfg.streams
             ]
         )
 
@@ -480,6 +502,7 @@ class Bursts:
         tau: float = 50e-6,
         dem_stream: str = "DD",
         aem_stream: str = "DA",
+        alias="fret_2cde",
     ) -> Bursts:
         if self.burst_data.is_empty():
             burst_data = self.burst_data.with_columns(pl.lit(None).alias("fret_2cde"))
@@ -499,7 +522,7 @@ class Bursts:
         )
 
         fret_2cde = compute_fret_2cde(self.photon_data, kde_data)
-        burst_data = self.burst_data.with_columns(pl.lit(fret_2cde).alias("fret_2cde"))
+        burst_data = self.burst_data.with_columns(pl.lit(fret_2cde).alias(alias))
 
         return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
 
@@ -509,6 +532,7 @@ class Bursts:
         tau: float = 50e-6,
         dex_streams: Optional[list[str]] = None,
         aex_streams: Optional[list[str]] = None,
+        alias="alex_2cde",
     ) -> Bursts:
         if self.burst_data.is_empty():
             burst_data = self.burst_data.with_columns(pl.lit(None).alias("alex_2cde"))
@@ -532,9 +556,22 @@ class Bursts:
         )
 
         alex_2cde = compute_alex_2cde(self.photon_data, kde_data)
-        burst_data = self.burst_data.with_columns(pl.lit(alex_2cde).alias("alex_2cde"))
+        burst_data = self.burst_data.with_columns(pl.lit(alex_2cde).alias(alias))
 
         return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
+
+    def with_columns(self, columns: list[pl.Expr]) -> Bursts:
+        return Bursts(
+            self.burst_data.with_columns(columns), self.photon_data, self.metadata, self.cfg
+        )
+
+    def drop(self, columns: list[str]) -> Bursts:
+        return Bursts(
+            self.burst_data.drop(columns),
+            self.photon_data,
+            self.metadata,
+            self.cfg,
+        )
 
     def __len__(self) -> int:
         """Number of bursts"""
