@@ -22,14 +22,12 @@ jobs:
     - name: Install uv
       run: pip install uv
 
-    - name: Create uv venv
+    - name: Create and activate venv, install package
       run: | 
         uv venv
-        . .venv/bin/activate
-
-    - name: Install package using uv
-      run: |
+        source .venv/bin/activate
         uv pip install dist/*.tar.gz
+        which dont-fret
 
     - name: Download test file
       run: |
@@ -38,4 +36,5 @@ jobs:
 
     - name: Run dont fret serve
       run: |
+        source .venv/bin/activate
         dont-fret process tests/test_data/input/ds1/datafile_1.ptu
