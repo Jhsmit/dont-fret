@@ -18,7 +18,6 @@ streams:
   AA: [laser_A, det_A]
   AD: [laser_A, det_D]
 
-# TODO this should move to web config
 burst_search:
   DCBS:  # name of the burst search
     - streams: [DD, DA]  # photons streams to use
@@ -34,12 +33,8 @@ burst_search:
       L: 50
       M: 100
       T: 500.e-6
-  test234:
-    - streams: [DD, DA, AA]
-      L: 500
-      M: 100
-      T: 500.e-6
 
+# dict of aggregations to apply
 aggregations:
   parse_expr:
     exprs:
@@ -67,10 +62,11 @@ transforms:
     tau: 45.e-6
   with_columns:
     exprs:
-      E_app: "n_DD / (n_DD + n_DA)"
+      E_app: "n_DA / (n_DD + n_DA)"
       S_app: "(n_DD + n_DA) / (n_DD + n_DA + n_AA)"
       timestamps_length: "timestamps_max - timestamps_min"
-
+  convert_timestamps: {} # converts timestamps columns to seconds
+  convert_nanotimes: {} # convert nanotime columns to nanoseconds
 
 # settings related to dont-fret's web interface
 web:
@@ -80,3 +76,4 @@ web:
   burst_filters: # default filters to apply to burst search filters
     - name: n_photons
       min: 150
+

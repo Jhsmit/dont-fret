@@ -269,7 +269,9 @@ def PlotSettingsEditDialog(
     duration: Optional[float] = None,
 ):
     copy = solara.use_reactive(plot_settings.value)
-    img, set_img = solara.use_state(cast(Optional[BinnedImage], None))
+    img, set_img = solara.use_state(
+        cast(Optional[BinnedImage], None)
+    )  # BinnedImage.from_settings(df, copy.value) ?
     items = order_columns(df.columns)
 
     drop_cols = ["filename", "burst_index"]

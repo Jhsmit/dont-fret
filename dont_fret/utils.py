@@ -1,9 +1,17 @@
 from __future__ import annotations
+
 from collections import OrderedDict
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-from typing import Any
+
+
+def suffice(name: str, suffix: str = "") -> str:
+    if suffix:
+        return f"{name}_{suffix}"
+    else:
+        return name
 
 
 def clean_types(d: Any) -> Any:

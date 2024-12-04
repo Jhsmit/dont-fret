@@ -12,7 +12,8 @@ from dacite.data import Data
 
 from dont_fret.utils import clean_types
 
-CONFIG_HOME = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
+CONFIG_HOME_DIR = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config")) / "dont-fret"
+CONFIG_DEFAULT_DIR = Path(__file__).parent
 
 
 @dataclass
@@ -66,7 +67,8 @@ class DontFRETConfig:
     channels: dict[str, Channel]
     streams: dict[str, list[str]]
     burst_search: dict[str, list[BurstColor]]
-    hooks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    aggregations: dict[str, dict[str, Any]] = field(default_factory=dict)
+    transforms: dict[str, dict[str, Any]] = field(default_factory=dict)
     web: Web = field(default_factory=Web)
 
     @classmethod
@@ -90,11 +92,23 @@ class DontFRETConfig:
         new_cfg = DontFRETConfig.from_dict(new_data)
         vars(self).update(vars(new_cfg))
 
+    def copy(self) -> DontFRETConfig:
+        return DontFRETConfig.from_dict(asdict(self))
+
+
+def update_config_from_yaml(config_path: Path) -> None:
+    """Updates the global configuration object with settings from a YAML file."""
+
+    data = yaml.safe_load(config_path.read_text())
+    cfg.update(data)
+
 
 cfg_file_paths = [
-    CONFIG_HOME / "dont_fret" / "dont_fret.yaml",
-    Path(__file__).parent / "default.yaml",
+    CONFIG_HOME_DIR / "dont_fret.yaml",
+    CONFIG_DEFAULT_DIR / "default.yaml",
 ]
+
+CONFIG_DEFAULT = DontFRETConfig.from_yaml(CONFIG_DEFAULT_DIR / "default.yaml")
 
 # take the first one which exists
 cfg_fpath = next((p for p in cfg_file_paths if p.exists()), None)

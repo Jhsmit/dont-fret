@@ -58,6 +58,13 @@ def evaluate_node(node):
         return pl.col(node.id)
     elif isinstance(node, ast.Constant):
         return pl.lit(node.n)
+    # args/kwargs not supported
+    elif isinstance(node, ast.Call):  # example: len() => pl.len()
+        try:
+            func = getattr(pl, node.func.id)
+        except AttributeError:
+            raise ValueError(f"Unsupported function: {node.func.id}")
+        return func()
     elif isinstance(node, ast.BinOp):
         left = evaluate_node(node.left)
         right = evaluate_node(node.right)

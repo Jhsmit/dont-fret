@@ -22,22 +22,19 @@ jobs:
     - name: Install uv
       run: pip install uv
 
-    - name: Create uv venv
+    - name: Create and activate venv, install package
       run: | 
         uv venv
-        . .venv/bin/activate
-
-    - name: Install package using uv
-      run: |
+        source .venv/bin/activate
         uv pip install dist/*.tar.gz
+        which dont-fret
 
-    - name: Run dont fret serve
+    - name: Download test file
       run: |
-        timeout 10s dont-fret serve || exit_code=$?
-        if [ $exit_code -eq 124 ]; then
-          echo "ran for 10 seconds without error"
-          exit 0
-        else
-          echo "failed or exited too quickly"
-          exit 1
-        fi
+        wget "https://filedn.eu/loRXwzWCNnU4XoFPGbllt1y/datafile_1.ptu" -O tests/test_data/input/ds1/datafile_1.ptu
+
+
+    - name: Run dont fret process
+      run: |
+        source .venv/bin/activate
+        dont-fret process tests/test_data/input/ds1/datafile_1.ptu

@@ -79,7 +79,11 @@ class ThreadedDataManager:
             try:
                 photon_data = await self.get_photons(photon_node)
                 bursts = await self.run(
-                    process_photon_data, photon_data, burst_colors, self.cfg.hooks
+                    process_photon_data,
+                    photon_data,
+                    burst_colors,
+                    self.cfg.aggregations,
+                    self.cfg.transforms,
                 )
 
                 future.set_result(bursts)
@@ -89,12 +93,6 @@ class ThreadedDataManager:
                 raise
 
         return await self.burst_cache[key]
-
-    async def search(self, node: PhotonNode, colors: list[BurstColor]) -> Bursts:
-        photon_data = await self.get_photons(node)
-        bursts = photon_data.burst_search(colors)
-
-        return bursts
 
     async def get_bursts_batch(
         self,

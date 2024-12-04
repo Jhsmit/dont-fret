@@ -34,20 +34,44 @@ burst_search:
       M: 100
       T: 500.e-6
 
-# post-burst search hooks to apply
-# hooks are of the form my_hook(burst_data, photon_data, **kwargs)
-# kwargs are as specified here
-hooks:
-  alex_2cde:
-    tau: 150.e-6 # make sure to format as float
+# dict of aggregations to apply
+aggregations:
+  parse_expr:
+    exprs:
+      n_photons: len()
+  # same as parse expr above
+  # length:
+  #   name: n_photons
+  stream_length: {}
+  stream_mean: 
+    column: nanotimes
+  column_stats: # get timestamps min/max/mean
+    column: timestamps
+  stream_asymmetry:
+    lhs_streams: [DD, DA]
+    rhs_streams: [AA]
+    column: timestamps
+
+# dict of transforms to apply in order
+transforms:
+  "alex_2cde:75":
+    tau: 75.e-6
+  "alex_2cde:150":
+    tau: 150.e-6
   fret_2cde:
-    tau: 50.e-6
+    tau: 45.e-6
+  with_columns:
+    exprs:
+      E_app: "n_DA / (n_DD + n_DA)"
+      S_app: "(n_DD + n_DA) / (n_DD + n_DA + n_AA)"
+      timestamps_length: "timestamps_max - timestamps_min"
+
 
 # settings related to dont-fret's web interface
 web:
-  password: null # set to null to disable password protection
-  default_dir: "~"  # default directory show in the file browser
-  protect_filebrowser: true # true to prevent navigation above default_dir
+  password: null
+  default_dir: tests\test_data\input\ds2 # default directory show in the file browser
+  protect_filebrowser: false # true to prevent navigation above default_dir
   burst_filters: # default filters to apply to burst search filters
     - name: n_photons
       min: 150

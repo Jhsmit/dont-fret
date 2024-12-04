@@ -3,8 +3,11 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+import polars.testing as pl_test
 import pytest
+import yaml
 
+from dont_fret.config import cfg
 from dont_fret.config.config import BurstColor
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import BinnedPhotonData, Bursts, PhotonData
@@ -32,12 +35,14 @@ def ph_ds1() -> PhotonData:
 
 @pytest.fixture
 def dcbs_bursts(ph_ds1: PhotonData) -> Bursts:
-    return ph_ds1.burst_search("DCBS")
+    bursts = process_photon_data(ph_ds1, cfg.burst_search["DCBS"])
+    return bursts
 
 
 @pytest.fixture
 def apbs_bursts(ph_ds1: PhotonData) -> Bursts:
-    return ph_ds1.burst_search(APBS_TEST)
+    bursts = process_photon_data(ph_ds1, APBS_TEST)
+    return bursts
 
 
 @pytest.fixture
@@ -88,39 +93,60 @@ def test_load_save_bursts(dcbs_bursts: Bursts, tmp_path: Path):
 
 
 def test_burst_search(ph_ds1: PhotonData):
-    search_args = ["DCBS", APBS_TEST]
+    search_args = [cfg.burst_search["DCBS"], APBS_TEST]
     reference_files = ["dcbs_bursts.csv", "apbs_bursts.csv"]
 
+    # only calculate E, S, time; no cde's
+    transforms = {
+        "with_columns": {
+            "exprs": {
+                "E_app": "n_DA / (n_DD + n_DA)",
+                "S_app": "(n_DD + n_DA) / (n_DD + n_DA + n_AA)",
+                "timestamps_length": "timestamps_max - timestamps_min",
+            }
+        }
+    }
+
     for bs_arg, ref_file in zip(search_args, reference_files):
-        bs = ph_ds1.burst_search(bs_arg)
+        bursts = process_photon_data(ph_ds1, bs_arg, transforms=transforms)
         pth = output_data_dir / "ds1" / ref_file
 
-        # bs = ph_ds1.burst_search("DCBS")
-        # pth = output_data_dir / "ds1" / "dcbs_bursts.csv"
-
         df_ref = pl.read_csv(pth)
-        df_test = bs.burst_data.filter(pl.col("n_photons") > 50)
+        df_test = bursts.burst_data.filter(pl.col("n_photons") > 50)
 
         for k in ["n_photons", "E_app", "S_app"]:
-            assert (df_ref[k] == df_test[k]).all()
+            pl_test.assert_series_equal(
+                df_test[k], df_ref[k], check_dtypes=False, check_names=False
+            )
 
-        time_length = (
-            df_test["timestamps_max"] - df_test["timestamps_min"]
-        ) * ph_ds1.timestamps_unit
-        assert (df_ref["time_length"] == time_length).all()
-        assert (df_ref["time_min"] == df_test["timestamps_min"] * ph_ds1.timestamps_unit).all()
-        assert (df_ref["time_max"] == df_test["timestamps_max"] * ph_ds1.timestamps_unit).all()
+        time_length = df_test["timestamps_length"] * ph_ds1.timestamps_unit
+        time_min = df_test["timestamps_min"] * ph_ds1.timestamps_unit
+        time_max = df_test["timestamps_max"] * ph_ds1.timestamps_unit
+        pl_test.assert_series_equal(time_length, df_ref["time_length"], check_names=False)
+        pl_test.assert_series_equal(time_min, df_ref["time_min"], check_names=False)
+        pl_test.assert_series_equal(time_max, df_ref["time_max"], check_names=False)
 
 
 def test_process_photon_data(ph_ds1: PhotonData):
-    hooks = {
-        "alex_2cde": {},
-        "fret_2cde": {},
-    }
+    s = """
+  "alex_2cde:75":
+    tau: 75.e-6
+  "alex_2cde:150":
+    tau: 150.e-6
+  fret_2cde:
+    tau: 45.e-6
+  with_columns:
+    exprs:
+      E_app: "n_DA / (n_DD + n_DA)"
+      S_app: "(n_DD + n_DA) / (n_DD + n_DA + n_AA)"
+      timestamps_length: "timestamps_max - timestamps_min"
+    """
 
-    bursts = process_photon_data(ph_ds1, APBS_TEST, hooks=hooks)
-    assert "alex_2cde" in bursts.burst_data.columns
-    assert "fret_2cde" in bursts.burst_data.columns
+    transforms = yaml.safe_load(s)
+
+    bursts = process_photon_data(ph_ds1, APBS_TEST, transforms=transforms)
+    assert "alex_2cde_75" in bursts.burst_data.columns
+    assert "alex_2cde_150" in bursts.burst_data.columns
 
 
 def test_binning(ph_ds1):
