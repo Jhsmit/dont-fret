@@ -11,7 +11,6 @@ from pathlib import Path
 import solara
 
 import dont_fret.web.state as state
-from dont_fret.web.bursts.components import BurstFigure
 from dont_fret.web.main import Page as MainPage
 from dont_fret.web.methods import batch_burst_search
 from dont_fret.web.models import FRETNode, PhotonNode

@@ -17,7 +17,6 @@ class FloatField(v.TextField):
         vmin, vmax = self.attributes.get("min"), self.attributes.get("max")
         self.error_messages = []
         try:
-            value = self.value
             if vmin is not None and self.value < vmin:
                 self.error_messages = [f"Input value must be larger than {vmin}"]
             elif vmax is not None and self.value > vmax:
@@ -41,7 +40,6 @@ class IntField(v.TextField):
         vmin, vmax = self.attributes.get("min"), self.attributes.get("max")
         self.error_messages = []
         try:
-            value = self.value
             if vmin is not None and self.value < vmin:
                 self.error_messages = [f"Input value must be larger than {vmin}"]
             elif vmax is not None and self.value > vmax:

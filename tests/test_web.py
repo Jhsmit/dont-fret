@@ -6,7 +6,6 @@ from typing import List
 import ipyvuetify as v
 import numpy as np
 import plotly.graph_objects as go
-import polars as pl
 import pytest
 import solara
 

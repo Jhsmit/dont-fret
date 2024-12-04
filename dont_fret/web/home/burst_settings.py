@@ -6,7 +6,7 @@ from solara.alias import rv
 
 from dont_fret.config import cfg
 from dont_fret.config.config import BurstColor
-from dont_fret.web.models import BurstSettingsStore, ListStore, use_liststore
+from dont_fret.web.models import ListStore, use_liststore
 
 
 @solara.component

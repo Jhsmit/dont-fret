@@ -89,3 +89,4 @@ line-length = 100
 
 [tool.ruff]
 line-length = 100
+exclude = ["dont_fret/_versioneer.py", "dont_fret/tmp.py", "tests/generate_fretbursts_kde.py"]

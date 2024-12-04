@@ -1,10 +1,9 @@
 # transforms.py
 from functools import wraps
-from typing import Any, Callable, Concatenate, Optional, ParamSpec, Protocol, Tuple
+from typing import Callable, Optional
 
 import polars as pl
 
-from dont_fret.config.config import DontFRETConfig
 from dont_fret.expr import parse_expression
 from dont_fret.models import Bursts, PhotonData
 from dont_fret.utils import suffice

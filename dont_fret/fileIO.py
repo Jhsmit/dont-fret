@@ -104,7 +104,7 @@ def _read_tag(f):
             tag["data"] = byte_string.decode("latin1")
     elif tag["type"] == "tyFloat8Array":
         buffer = f.read(tag["value"])
-        tag["data"] = np.frombuffer(buffer, dtype="float", count=tag["value"] / 8)
+        tag["data"] = np.frombuffer(buffer, dtype="float", count=tag["value"] / 8)  # type: ignore
     elif tag["type"] == "tyWideString":
         # WideString use type WCHAR in the original C++ demo code.
         # WCHAR size is not fixed by C++ standard, but on windows

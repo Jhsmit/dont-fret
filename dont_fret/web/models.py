@@ -9,9 +9,7 @@ from pathlib import Path
 from typing import (
     Callable,
     ContextManager,
-    Dict,
     Generic,
-    List,
     Optional,
     Tuple,
     TypedDict,
@@ -21,7 +19,6 @@ from typing import (
 import numpy as np
 import polars as pl
 import solara
-from solara import Reactive
 from solara.toestand import merge_state
 
 from dont_fret import cfg

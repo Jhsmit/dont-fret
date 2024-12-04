@@ -4,7 +4,6 @@ from typing import Callable, Iterable, Optional
 import polars as pl
 
 from dont_fret.expr import parse_expression
-from dont_fret.models import Bursts, PhotonData
 from dont_fret.utils import suffice
 
 # photon aggregation hooks

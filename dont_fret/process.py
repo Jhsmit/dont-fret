@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from inspect import signature
@@ -11,7 +10,7 @@ import polars as pl
 from tqdm.auto import tqdm
 
 from dont_fret.aggregation import aggregation_registry
-from dont_fret.config import CONFIG_DEFAULT, CONFIG_DEFAULT_DIR, BurstColor, DontFRETConfig, cfg
+from dont_fret.config import BurstColor, DontFRETConfig, cfg
 from dont_fret.fileIO import PhotonFile
 from dont_fret.models import Bursts, PhotonData
 from dont_fret.transform import transform_registry
@@ -84,7 +83,7 @@ def apply_aggregations(
     for agg_name, agg_params in aggregations.items():
         split = agg_name.split(":", 1)
         base_name = split[0]
-        suffix = split[1] if len(split) > 1 else ""
+        suffix = split[1] if len(split) > 1 else ""  # noqa: F841
 
         agg_fn = aggregation_registry[base_name]
         kwargs = agg_params

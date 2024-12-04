@@ -4,7 +4,7 @@ import itertools
 import math
 from functools import reduce
 from operator import and_
-from typing import Any, Literal, Optional, TypedDict, Union
+from typing import Literal, Optional, TypedDict, Union
 
 import altair as alt
 import numpy as np

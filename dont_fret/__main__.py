@@ -1,12 +1,10 @@
-import os
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import Literal, Optional
 
 import click
-import yaml
 from solara.__main__ import run
 
-from dont_fret.config import CONFIG_DEFAULT_DIR, CONFIG_HOME_DIR, cfg, update_config_from_yaml
+from dont_fret.config import CONFIG_DEFAULT_DIR, CONFIG_HOME_DIR, update_config_from_yaml
 from dont_fret.process import batch_search_and_save, search_and_save
 
 ROOT = Path(__file__).parent
