@@ -69,7 +69,7 @@ def RangeInputField(
             value = vtype(new_value)
 
         except ValueError:
-            if vtype == int:
+            if vtype is int:
                 message.set("Input must be an integer")
             else:
                 message.set("Input must be a number")
