@@ -398,7 +398,7 @@ class Bursts:
         alias="fret_2cde",
     ) -> Bursts:
         if self.burst_data.is_empty():
-            burst_data = self.burst_data.with_columns(pl.lit(None).alias("fret_2cde"))
+            burst_data = self.burst_data.with_columns(pl.lit(None).alias(alias))
             return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
 
         assert photons.timestamps_unit
@@ -428,7 +428,7 @@ class Bursts:
         alias="alex_2cde",
     ) -> Bursts:
         if self.burst_data.is_empty():
-            burst_data = self.burst_data.with_columns(pl.lit(None).alias("alex_2cde"))
+            burst_data = self.burst_data.with_columns(pl.lit(None).alias(alias))
             return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
 
         dex_streams = dex_streams if dex_streams else ["DD", "DA"]
