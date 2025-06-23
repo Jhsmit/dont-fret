@@ -416,7 +416,6 @@ def BurstItemInfoCard(node_name: str, burst_node: BurstNode, on_delete: Callable
         inter_burst_times = df["time_mean"].diff().drop_nulls()
         ibt_mean, ibt_std = inter_burst_times.mean(), inter_burst_times.std()
         item["ibt"] = f"{ibt_mean:.2f} ± {ibt_std:.2f}"
-        items.append(item)
 
         bps_mean = 1 / ibt_mean  # type: ignore
         bps_std = (1 / (ibt_mean**2)) * ibt_std  # type: ignore
@@ -424,12 +423,14 @@ def BurstItemInfoCard(node_name: str, burst_node: BurstNode, on_delete: Callable
         item["bps"] = f"{bps_mean:.2f} ± {bps_std:.2f}"
 
         item["n_photons"] = f"{df['n_photons'].mean():.1f} ± {df['n_photons'].std():.1f}"
-        item[
-            "time_length"
-        ] = f"{df['time_length'].mean()*1e3:.2f} ± {df['time_length'].std()*1e3:.2f}"  # type: ignore
+        item["time_length"] = (
+            f"{df['time_length'].mean() * 1e3:.2f} ± {df['time_length'].std() * 1e3:.2f}"  # type: ignore
+        )
 
         burst_cps = df["n_photons"] / df["time_length"]
-        item["burst_cps"] = f"{burst_cps.mean()*1e-3:.2f} ± {burst_cps.std()*1e-3:.2f}"  # type: ignore
+        item["burst_cps"] = f"{burst_cps.mean() * 1e-3:.2f} ± {burst_cps.std() * 1e-3:.2f}"  # type: ignore
+
+        items.append(item)
 
     with solara.Card(f"{node_name} / Bursts / {burst_node.name}"):
         solara.Text(f"Total number of bursts: {len(burst_node.df)}", style="font-weight: bold;")
