@@ -48,7 +48,7 @@ def Page():
         state.fret_nodes.set([])
         if len(state.fret_nodes) == 0:
             state.fret_nodes.extend([node_1])
-        state.disable_trace_page.set(False)
+        state.disable_burst_page.set(False)
         state.disable_trace_page.set(False)
 
     solara.use_effect(preload, dependencies=[counter.value])
