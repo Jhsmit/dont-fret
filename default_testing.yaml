@@ -34,11 +34,6 @@ burst_search:
       L: 50
       M: 100
       T: 500.e-6
-  test234:
-    - streams: [DD, DA, AA]
-      L: 500
-      M: 100
-      T: 500.e-6
 
 aggregations:
   parse_expr:
@@ -67,15 +62,16 @@ transforms:
     tau: 45.e-6
   with_columns:
     exprs:
-      E_app: "n_DD / (n_DD + n_DA)"
+      E_app: "n_DA / (n_DD + n_DA)"
       S_app: "(n_DD + n_DA) / (n_DD + n_DA + n_AA)"
       timestamps_length: "timestamps_max - timestamps_min"
-
+  convert_timestamps: {} # converts timestamps columns to seconds
+  convert_nanotimes: {} # convert nanotime columns to nanoseconds
 
 # settings related to dont-fret's web interface
 web:
   password: null
-  default_dir: tests\test_data\input\ds2 # default directory show in the file browser
+  default_dir: C:\Users\jhsmi\OneDrive\OneDrive - KU Leuven\FATMA_TF_A160E96_RNCS # default directory show in the file browser
   protect_filebrowser: false # true to prevent navigation above default_dir
   burst_filters: # default filters to apply to burst search filters
     - name: n_photons
