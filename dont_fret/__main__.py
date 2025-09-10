@@ -49,7 +49,6 @@ def serve(config: Optional[str] = None, solara_args=None):
     if "--production" not in solara_args:
         solara_args = (*solara_args, "--production")
     args = [str(APP_PATH), *solara_args]
-    print(args)
 
     run(args)
 
