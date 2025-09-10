@@ -65,12 +65,13 @@ transforms:
       E_app: "n_DA / (n_DD + n_DA)"
       S_app: "(n_DD + n_DA) / (n_DD + n_DA + n_AA)"
       timestamps_length: "timestamps_max - timestamps_min"
-
+  convert_timestamps: {} # converts timestamps columns to seconds
+  convert_nanotimes: {} # convert nanotime columns to nanoseconds
 
 # settings related to dont-fret's web interface
 web:
   password: null
-  default_dir: tests\test_data\input\ds2 # default directory show in the file browser
+  default_dir: "~" # default directory show in the file browser
   protect_filebrowser: false # true to prevent navigation above default_dir
   burst_filters: # default filters to apply to burst search filters
     - name: n_photons
