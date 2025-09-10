@@ -33,6 +33,18 @@ class PhotonData:
         self.metadata = metadata or {}
         self.cfg = cfg
 
+    def __eq__(self, other):
+        if not isinstance(other, PhotonData):
+            return False
+        elif self.metadata != other.metadata:
+            return False
+        elif self.cfg != other.cfg:
+            return False
+        elif len(self.data) != len(other.data):
+            return False
+        else:
+            return self.data.equals(other.data)
+
     def __str__(self):
         s = str(self.__class__) + " object\n"
         s += f"Number of photons: {len(self)}\n"
@@ -365,6 +377,20 @@ class Bursts:
     photon_data: pl.DataFrame
     metadata: Optional[dict] = None
     cfg: Optional[DontFRETConfig] = None
+
+    def __eq__(self, other):
+        if not isinstance(other, Bursts):
+            return False
+        elif self.metadata != other.metadata:
+            return False
+        elif self.cfg != other.cfg:
+            return False
+        elif self.burst_data.equals(other.burst_data) is False:
+            return False
+        elif self.photon_data.equals(other.photon_data) is False:
+            return False
+        else:
+            return True
 
     @classmethod
     def load(cls, directory: Path) -> Bursts:
