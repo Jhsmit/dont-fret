@@ -69,7 +69,7 @@ class PhotonNode:
 @dataclasses.dataclass
 class BurstNode:
     name: str
-    df: pl.DataFrame
+    df: pl.DataFrame  # access via manager class?
     colors: list[BurstColor] = dataclasses.field(default_factory=list)
     id: uuid.UUID = dataclasses.field(default_factory=lambda: uuid.uuid4())
 
