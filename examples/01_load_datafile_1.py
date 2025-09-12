@@ -29,19 +29,3 @@ bursts = process_photon_data(photons, cfg.burst_search["DCBS"], cfg.aggregations
 
 bursts
 # %%
-
-import pickle
-#%%
-
-%timeit pickle.dumps(bursts)   
-# %%
-
-b_load = pickle.loads(pickle.dumps(bursts))
-b_load
-# %%
-
-from diskcache import Cache 
-
-cache = Cache()
-
-cache.add('bursts', bursts)
