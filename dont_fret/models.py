@@ -479,7 +479,7 @@ class Bursts:
 
         return Bursts(burst_data, self.photon_data, self.metadata, self.cfg)
 
-    def with_columns(self, columns: list[pl.Expr]) -> Bursts:
+    def with_columns(self, columns: list[pl.Expr | pl.Series]) -> Bursts:
         return Bursts(
             self.burst_data.with_columns(columns), self.photon_data, self.metadata, self.cfg
         )
