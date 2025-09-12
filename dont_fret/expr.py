@@ -86,3 +86,9 @@ def apply_operator(op, left, right):
         return left.pow(right)
     else:
         raise ValueError(f"Unsupported operator: {type(op).__name__}")
+
+
+# Default expressions for FRET efficiency and Stoichiometry
+# Assumes DA is FRET channel (notation is EM EX)
+E_APP = parse_expression("n_DA / (n_DD + n_DA)").alias("E_app")
+S_APP = parse_expression("(n_DD + n_DA) / (n_DD + n_DA + n_AA)").alias("S_app")
