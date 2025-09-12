@@ -1,7 +1,8 @@
 # %%
-
 """
-launch dont-fret web with preloaded data
+Launch dont-fret web with preloaded data
+run: `solara run 06_preload_web.py`
+
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from dont_fret.config import cfg
 
 
 # %%
-# optionally change config
+# Optional: change config
 load_config(Path("default_testing.yaml"))
 
 # %%

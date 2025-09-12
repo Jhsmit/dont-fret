@@ -1,6 +1,7 @@
 # %%
-"""template for creating web models and using them to launch solara parts
-for interactive use only
+"""
+Example for directly interacting with the web interface models.
+This script is designed to run VSCode's interactive window
 
 """
 
@@ -12,8 +13,6 @@ import solara
 
 from dont_fret.config import cfg
 from dont_fret.web.bursts.components import BurstFigure
-
-# SyncDataManager,
 from dont_fret.web.methods import make_burst_nodes
 from dont_fret.web.models import FRETNode, ListStore, PhotonNode
 
@@ -25,7 +24,6 @@ burst_nodes = make_burst_nodes(photon_nodes, cfg.burst_search)
 
 
 # %%
-
 node_1 = FRETNode(
     name=solara.Reactive("my_node"),
     photons=ListStore(photon_nodes),

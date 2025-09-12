@@ -26,3 +26,22 @@ update_config_from_yaml(CONFIG_DEFAULT_DIR / "default_web.yaml")
 # process photon data to get DCBS bursts
 photons = PhotonData.from_file(PhotonFile(test_data_dir / ptu_file))
 bursts = process_photon_data(photons, cfg.burst_search["DCBS"], cfg.aggregations, cfg.transforms)
+
+bursts
+# %%
+
+import pickle
+#%%
+
+%timeit pickle.dumps(bursts)   
+# %%
+
+b_load = pickle.loads(pickle.dumps(bursts))
+b_load
+# %%
+
+from diskcache import Cache 
+
+cache = Cache()
+
+cache.add('bursts', bursts)
